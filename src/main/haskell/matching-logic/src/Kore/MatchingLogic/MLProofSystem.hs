@@ -1,8 +1,6 @@
 module Kore.MatchingLogic.MLProofSystem where
 
-import           Data.Text
-
-import           Data.Kore.AST.Common
+import           Data.Kore.AST.Common            (Meta, Variable)
 import           Data.Kore.AST.Kore
 
 import           Kore.MatchingLogic.Error

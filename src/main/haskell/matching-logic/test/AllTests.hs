@@ -1,27 +1,28 @@
-import           Test.Tasty                               (TestTree, testGroup)
+import           Test.Tasty                                   (TestTree,
+                                                               testGroup)
 
-import           Test.Tasty.Runners                       (consoleTestReporter, defaultMainWithIngredients,
-                                                           listingTests)
-import           Test.Tasty.Runners.AntXML                (antXMLRunner)
+import           Test.Tasty.Runners                           (consoleTestReporter,
+                                                               defaultMainWithIngredients,
+                                                               listingTests)
+import           Test.Tasty.Runners.AntXML                    (antXMLRunner)
+
+import           Kore.MatchingLogic.Proofs.ProofAssistantTest
 
 main :: IO ()
-main = do
-    inputFiles <- regressionTestsInputFiles "test/resources/"
+main =
     defaultMainWithIngredients
         [antXMLRunner, listingTests, consoleTestReporter]
-        (allParserTests inputFiles)
+        allParserTests
 
-allParserTests :: [String] -> TestTree
-allParserTests regressionInputFiles =
+allParserTests :: TestTree
+allParserTests =
     testGroup
         " All Matching Logic Tests"
-        [ unitTests
-        , regressionTests regressionInputFiles
-        ]
+        [ unitTests ]
 
 unitTests :: TestTree
 unitTests =
     testGroup
         " Unit Tests"
-        [
+        [ proofAssistantTests
         ]
