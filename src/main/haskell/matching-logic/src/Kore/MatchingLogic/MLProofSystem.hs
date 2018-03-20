@@ -1,28 +1,34 @@
 module Kore.MatchingLogic.MLProofSystem where
-import Kore.MatchingLogic.HilbertProof
-import Data.Text
 
-type Pattern = ()
-type Var = Text
+import           Data.Text
+
+import           Data.Kore.AST.Common
+import           Data.Kore.AST.Kore
+
+import           Kore.MatchingLogic.Error
+import           Kore.MatchingLogic.HilbertProof
+
+type Var = Variable Meta
 type Symbol = ()
 
-data MLRule =
-   Propositional1 Pattern Pattern
- | Propositional2 Pattern Pattern Pattern
- | Propositional3 Pattern Pattern
- | ModusPonens Pattern Pattern -- ix ix
- | Generalization Var Pattern -- Var ix
- | VariableSubstitution Var Var Pattern
- | Forall Var Pattern Pattern
- | Necessitation Symbol Int Pattern --Symbol Int ix
- | PropagatenOr Symbol Int Pattern Pattern
+data MLRule index =
+   Propositional1 index index
+ | Propositional2 index index index
+ | Propositional3 index index
+ | ModusPonens index index
+ | Generalization Var index -- Var ix
+ | VariableSubstitution Var Var index
+ | Forall Var index index
+ | Necessitation Symbol Int index --Symbol Int ix
+ | PropagateOr Symbol Int index index
      -- ^ sigma(before ..,\phi1 \/ \phi2,.. after) <->
      --     sigma(before ..,\phi1, .. after) <-> sigma(before ..,\phi2,.. after)
- | PropagateExists Symbol Int Var Pattern
+ | PropagateExists Symbol Int Var index
      -- ^ sigma(before ..,Ex x. phi,.. after) <-> Ex x.sigma(before ..,phi,.. after)
  | Existence Var
      -- ^ Ex x.x
- | Singvar Var Pattern [Int] [Int]
+ | Singvar Var index [Int] [Int]
 
-instance ProofSystem MLRule Pattern where
-  checkDerivation _ _ _ = True
+instance (Show index, Eq index)
+    => ProofSystem (MLRule index) UnifiedPattern where
+  checkDerivation _ _ _ = mlSuccess

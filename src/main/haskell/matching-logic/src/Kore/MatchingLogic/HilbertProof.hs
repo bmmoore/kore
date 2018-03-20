@@ -1,3 +1,5 @@
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
 module Kore.MatchingLogic.HilbertProof
   (Proof(index,claims,derivations)
   ,ProofSystem(..)
@@ -6,18 +8,22 @@ module Kore.MatchingLogic.HilbertProof
   ,derive
   ,renderProof
   )   where
-import Data.List(lookup,delete,nub)
-import Control.Monad(guard)
-import Data.Map.Strict(Map)
-import qualified Data.Map.Strict as Map
-import Data.Sequence(Seq,(|>))
-import qualified Data.Sequence as Seq
-import Data.Foldable
+import           Control.Monad            (guard)
+import           Data.Foldable
+import           Data.List                (delete, lookup, nub)
+import           Data.Map.Strict          (Map)
+import qualified Data.Map.Strict          as Map
+import           Data.Sequence            (Seq, (|>))
+import qualified Data.Sequence            as Seq
+
+import           Data.Kore.Error
+
+import           Kore.MatchingLogic.Error
 
 data Proof ix rule formula =
   Proof
-  { index :: Map ix (Int,formula)
-  , claims :: Seq (ix,formula)
+  { index       :: Map ix (Int,formula)
+  , claims      :: Seq (ix,formula)
   , derivations :: Map ix (rule,[(ix,formula)])
   }
   deriving (Show)
@@ -25,15 +31,18 @@ data Proof ix rule formula =
 emptyProof :: Proof ix rule formula
 emptyProof = Proof Map.empty Seq.empty Map.empty
 
-add :: (Ord ix)
-    => Proof ix rule formula -> ix -> formula -> Maybe (Proof ix rule formula)
-add proof ix formula
-  | not (Map.member ix (index proof)) = Just $
-    proof { index = Map.insert ix (Seq.length (claims proof), formula) (index proof)
-          , claims = claims proof |> (ix,formula)
-          , derivations = derivations proof
-          }
-  | otherwise = Nothing
+add :: (Show ix, Ord ix)
+    => Proof ix rule formula -> ix -> formula
+    -> Either (Error MLError) (Proof ix rule formula)
+add proof ix formula = do
+  koreFailWhen
+    (Map.member ix (index proof))
+    ("A formula with ID '" ++ show ix ++ "already exists")
+  return proof
+    { index = Map.insert ix (Seq.length (claims proof), formula) (index proof)
+    , claims = claims proof |> (ix,formula)
+    , derivations = derivations proof
+    }
 
 renderProof :: (Ord ix, Show ix, Show rule, Show formula)
             => Proof ix rule formula -> String
@@ -47,19 +56,39 @@ renderProof proof = unlines
   | (ix,formula) <- toList (claims proof)]
 
 class Eq formula => ProofSystem rule formula | rule -> formula where
-  checkDerivation :: rule -> formula -> [formula] -> Bool
+  checkDerivation
+    :: rule
+    -> formula
+    -> [formula]
+    -> Either (Error MLError) MLSuccess
 
-derive :: (Ord ix, ProofSystem rule formula)
+derive :: (Show ix, Ord ix, ProofSystem rule formula)
        => Proof ix rule formula
        -> ix -> formula -> rule -> [(ix,formula)]
-       -> Maybe (Proof ix rule formula)
+       -> Either (Error MLError) (Proof ix rule formula)
 derive proof ix f rule arguments = do
-  let checkOffset (name,formula) =
-        do (offset,formula') <- Map.lookup name (index proof)
-           guard (formula == formula')
-           return offset
+  let
+    checkOffset (name,formula) =
+      case Map.lookup name (index proof) of
+        Nothing -> koreFail ("Formula with ID '" ++ show name ++ " not found.")
+        Just (offset,formula') -> do
+          koreFailWhen (formula /= formula')
+            ("Expected a different formula for id '" ++ show name ++ "'.")
+          return offset
+    verifyArgument conclusionId conclusionOffset argument = do
+      argumentOffset <- checkOffset argument
+      koreFailWhen (conclusionOffset <= argumentOffset)
+        (  "Hypothesis ('"
+        ++ show (fst argument)
+        ++ "') must be defined before the conclusion ('"
+        ++ show conclusionId
+        ++ "')"
+        )
+      mlSuccess
   offset <- checkOffset (ix,f)
-  guard $ not (Map.member ix (derivations proof))
-  guard $ all (maybe False (< offset) . checkOffset) arguments
-  guard $ checkDerivation rule f (map snd arguments)
-  return (proof { derivations = Map.insert ix (rule,arguments) (derivations proof) })
+  koreFailWhen (Map.member ix (derivations proof))
+    ("Formula with ID '" ++ show ix ++ " already has a derivation.")
+  mapM_ (verifyArgument ix offset) arguments
+  checkDerivation rule f (map snd arguments)
+  return
+    (proof { derivations = Map.insert ix (rule,arguments) (derivations proof) })
