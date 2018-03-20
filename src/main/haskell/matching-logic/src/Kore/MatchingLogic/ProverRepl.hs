@@ -1,15 +1,21 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Kore.MatchingLogic.ProverRepl where
-import Kore.MatchingLogic.HilbertProof
 
-import System.Console.Haskeline
-import Control.Monad.IO.Class(liftIO)
-import Control.Monad.State.Strict(StateT,execStateT,MonadState(..),modify')
-import Control.Monad.Trans(MonadTrans(lift))
-import qualified Data.Map.Strict as Map
-import Data.List(isPrefixOf,isSuffixOf)
-import Data.Text(Text,pack)
-import Text.Parsec
-import Text.Parsec.String
+import           Kore.MatchingLogic.Error
+import           Kore.MatchingLogic.HilbertProof
+
+import           Data.Kore.Error
+
+import           Control.Monad.IO.Class          (liftIO)
+import           Control.Monad.State.Strict      (MonadState (..), StateT,
+                                                  execStateT, modify')
+import           Control.Monad.Trans             (MonadTrans (lift))
+import           Data.List                       (isPrefixOf, isSuffixOf)
+import qualified Data.Map.Strict                 as Map
+import           Data.Text                       (Text, pack)
+import           System.Console.Haskeline
+import           Text.Parsec
+import           Text.Parsec.String
 
 newtype ProverState ix rule formula =
   ProverState (Proof ix rule formula)
@@ -19,17 +25,26 @@ data Command id rule formula =
  | Derive id formula rule [id]
  deriving Show
 
-applyCommand :: (Ord id, ProofSystem rule formula)
+applyCommand :: (Show id, Ord id, ProofSystem rule formula)
              => Command id rule formula
              -> Proof id rule formula
-             -> Maybe (Proof id rule formula)
+             -> Either (Error MLError) (Proof id rule formula)
 applyCommand command proof = case command of
   Add id f -> add proof id f
   Derive id f rule argIds -> do
-    argTerms <- traverse (\ix -> fmap snd (Map.lookup ix (index proof))) argIds
+    let
+      findTerm ix =
+        case Map.lookup ix (index proof) of
+          Just (_, term) -> return term
+          Nothing -> koreFail ("Formula with id '" ++ show ix ++ "' not found.")
+    argTerms <- mapM findTerm argIds
     derive proof id f rule (zip argIds argTerms)
 
-parseCommand :: Parser id -> Parser formula -> Parser (rule,[id]) -> Parser (Command id rule formula)
+parseCommand
+  :: Parser id
+  -> Parser formula
+  -> Parser (rule,[id])
+  -> Parser (Command id rule formula)
 parseCommand pId pFormula pDerivation = do
   id <- pId
   spaces
@@ -60,9 +75,10 @@ runProver pCommand initialState =
            outputStrLn (show cmd)
            ProverState state <- lift get
            case applyCommand cmd state of
-             Just state' -> do
+             Right state' -> do
                lift (put (ProverState state'))
                outputStrLn (renderProof state')
                repl
-             Nothing -> outputStrLn "command failed" >> repl
+             Left err ->
+              outputStrLn ("command failed" ++ printError err) >> repl
        Nothing -> return ()
