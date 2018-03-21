@@ -35,6 +35,7 @@ library
       src
   build-depends: base >=4.7 && <5
                , containers
+               , language-kore
                , mtl
                , text
                , parsec
@@ -43,6 +44,8 @@ library
   exposed-modules:
       Kore.MatchingLogic.HilbertProof
     , Kore.MatchingLogic.DummyProofSystem
+    , Kore.MatchingLogic.Error
+    , Kore.MatchingLogic.MLProofSystem
     , Kore.MatchingLogic.ProverRepl
   default-language: Haskell2010
   default-extensions: DataKinds
@@ -65,10 +68,15 @@ test-suite test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       QuickCheck
+    , base >=4.7 && <5
+    , containers
+    , language-kore
     , matching-logic
     , tasty
     , tasty-ant-xml
     , tasty-golden
     , tasty-hunit
     , tasty-quickcheck
+  other-modules:
+      Kore.MatchingLogic.Proofs.ProofAssistantTest
   default-language: Haskell2010
