@@ -38,6 +38,8 @@ data Meta = Meta
 data Object = Object
     deriving (Show, Eq, Ord, Typeable)
 
+data NoUserData = NoUserData
+
 {-|'Id' corresponds to the @object-identifier@ and @meta-identifier@
 syntactic categories from the Semantics of K, Section 9.1.1 (Lexicon).
 

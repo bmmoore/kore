@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-|
 Description: A simple textual interface for building a proof
 
@@ -8,20 +10,28 @@ Parsers must be provided for the formulas, rules, and labels of
 a particular instance of 'HilbertProof'.
 -}
 module Kore.MatchingLogic.ProverRepl where
+
+import           Kore.MatchingLogic.Error
 import           Kore.MatchingLogic.HilbertProof
 
-import           Control.Monad.IO.Class          (liftIO)
-import           Control.Monad.State.Strict      (MonadState (..), StateT,
-                                                  execStateT, modify')
-import           Control.Monad.Trans             (MonadTrans (lift))
-import           Data.List                       (isPrefixOf, isSuffixOf)
-import qualified Data.Map.Strict                 as Map
-import           Data.Text                       (Text, pack)
+import           Data.Kore.ASTVerifier.DefinitionVerifier (implicitIndexedModule)
+import           Data.Kore.Error
+
+import           Control.Monad.IO.Class                   (liftIO)
+import           Control.Monad.State.Strict               (MonadState (..),
+                                                           StateT, execStateT,
+                                                           modify')
+import           Control.Monad.Trans                      (MonadTrans (lift))
+import           Data.List                                (isPrefixOf,
+                                                           isSuffixOf)
+import qualified Data.Map.Strict                          as Map
+import           Data.Text                                (Text, pack)
+import           Data.Text.Prettyprint.Doc                (Pretty (pretty),
+                                                           colon, (<+>))
 import           Data.Void
 import           System.Console.Haskeline
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
-import           Data.Text.Prettyprint.Doc(Pretty(pretty),(<+>),colon)
 
 newtype ProverState ix rule formula =
   ProverState (Proof ix rule formula)
@@ -31,12 +41,13 @@ data Command id rule formula =
  | Derive id formula (rule id)
  deriving Show
 
-applyCommand :: (Ord id, ProofSystem rule formula)
-             => Command id rule formula
+applyCommand :: (Ord id, Pretty id, ProofSystem error rule formula)
+             => (formula -> Either (Error error) ())
+             -> Command id rule formula
              -> Proof id rule formula
-             -> Maybe (Proof id rule formula)
-applyCommand command proof = case command of
-  Add id f         -> add proof id f
+             -> Either (Error error) (Proof id rule formula)
+applyCommand formulaVerifier command proof = case command of
+  Add id f         -> add formulaVerifier proof id f
   Derive id f rule -> derive proof id f rule
 
 type Parser = Parsec Void Text
@@ -59,11 +70,17 @@ instance (Pretty id, Pretty formula, Pretty (rule id)) => Pretty (Command id rul
   pretty (Add id formula) = pretty id<+>colon<+>pretty formula
   pretty (Derive id formula rule) = pretty id<+>colon<+>pretty formula<+>pretty("by"::Text)<+>pretty rule
 
-runProver :: (Ord ix, ProofSystem rule formula, Pretty ix, Pretty (rule ix), Pretty formula)
-          => Parser (Command ix rule formula)
-          -> ProverState ix rule formula
-          -> IO (ProverState ix rule formula)
-runProver pCommand initialState =
+runProver
+  ::  ( Ord ix
+      , ProofSystem error rule formula
+      , Pretty ix
+      , Pretty (rule ix)
+      , Pretty formula)
+  => (formula -> Either (Error error) ())
+  -> Parser (Command ix rule formula)
+  -> ProverState ix rule formula
+  -> IO (ProverState ix rule formula)
+runProver formulaVerifier pCommand initialState =
     execStateT (runInputT defaultSettings startRepl) initialState
   where
     startRepl = outputStrLn "Matching Logic prover started" >> repl
@@ -77,10 +94,11 @@ runProver pCommand initialState =
           Left err -> outputStrLn (parseErrorPretty err) >> repl
           Right cmd -> do
             ProverState state <- lift get
-            case applyCommand cmd state of
-              Just state' -> do
+            case applyCommand formulaVerifier cmd state of
+              Right state' -> do
                 lift (put (ProverState state'))
                 outputStrLn (show (renderProof state'))
                 repl
-              Nothing -> outputStrLn "command failed" >> repl
+              Left err ->
+                outputStrLn ("command failed" ++ printError err) >> repl
         Nothing -> return ()

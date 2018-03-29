@@ -57,3 +57,17 @@ withContext
   =
     Left err { errorContext = localContext : context }
 withContext _ result = result
+
+castError :: Either (Error a) result -> Either (Error b) result
+castError
+    (Left Error
+        { errorContext = context
+        , errorError = err
+        }
+    )
+  =
+    Left Error
+        { errorContext = context
+        , errorError = err
+        }
+castError (Right r) = Right r

@@ -1,3 +1,6 @@
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE GADTs          #-}
+{-# LANGUAGE Rank2Types     #-}
 {-|
 Module      : Data.Kore.MLPatterns
 Description : Classes for handling patterns in an uniform way.
@@ -8,7 +11,9 @@ Stability   : experimental
 Portability : portable
 -}
 module Data.Kore.AST.MLPatterns (MLPatternClass(..),
-                                 MLBinderPatternClass (..)) where
+                                 MLBinderPatternClass (..),
+                                 PatternTransformer(..),
+                                 transformPattern) where
 
 import           Data.Kore.AST.Common
 import           Data.Kore.AST.Kore
@@ -163,3 +168,61 @@ instance MLBinderPatternClass Forall where
         , forallVariable = variable
         , forallChild = pat
         }
+
+data PatternTransformer level child result = PatternTransformer
+    { patternTransformerML
+        :: forall patt . MLPatternClass patt => patt level child -> result
+    , patternTransformerMLBinder
+        :: forall patt . MLBinderPatternClass patt
+        => patt level Variable child
+        -> result
+    , stringTransformer :: StringLiteral -> result
+    , charTransformer :: CharLiteral -> result
+    , applicationTransformer :: Application level child -> result
+    , variableTransformer :: Variable level -> result
+    }
+
+transformPattern
+    :: PatternTransformer level child result
+    -> Pattern level Variable child
+    -> result
+transformPattern transformer (AndPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (ApplicationPattern a) =
+    applicationTransformer transformer a
+transformPattern transformer (BottomPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (CeilPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (DomainValuePattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (EqualsPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (ExistsPattern a) =
+    patternTransformerMLBinder transformer a
+transformPattern transformer (FloorPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (ForallPattern a) =
+    patternTransformerMLBinder transformer a
+transformPattern transformer (IffPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (ImpliesPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (InPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (NextPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (NotPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (OrPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (RewritesPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (StringLiteralPattern a) =
+    stringTransformer transformer a
+transformPattern transformer (CharLiteralPattern a) =
+    charTransformer transformer a
+transformPattern transformer (TopPattern a) =
+    patternTransformerML transformer a
+transformPattern transformer (VariablePattern a) =
+    variableTransformer transformer a

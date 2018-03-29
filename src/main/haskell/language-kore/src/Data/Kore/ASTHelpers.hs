@@ -6,7 +6,7 @@ module Data.Kore.ASTHelpers ( ApplicationSorts (..)
 import           Data.Kore.AST.Common
 import           Data.Kore.Error
 
-import qualified Data.Map             as Map
+import qualified Data.Map                              as Map
 
 data ApplicationSorts level = ApplicationSorts
     { applicationSortsOperands :: ![Sort level]

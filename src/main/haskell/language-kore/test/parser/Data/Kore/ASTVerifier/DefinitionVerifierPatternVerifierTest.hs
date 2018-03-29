@@ -8,6 +8,8 @@ import           Data.Kore.AST.Common
 import           Data.Kore.AST.Kore
 import           Data.Kore.AST.MetaOrObject
 import           Data.Kore.ASTVerifier.DefinitionVerifierTestHelpers
+import           Data.Kore.Building.Implicit
+import           Data.Kore.Building.Patterns
 import           Data.Kore.Error
 import           Data.Kore.Implicit.ImplicitSorts
 
@@ -66,14 +68,7 @@ definitionVerifierPatternVerifierTests =
             -- at least in some cases.
             NeedsInternalDefinitions
         , successTestsForMetaPattern "implicit meta pattern"
-            (ApplicationPattern Application
-                { applicationSymbolOrAlias = SymbolOrAlias
-                    { symbolOrAliasConstructor = Id "#nilSortList"
-                    , symbolOrAliasParams = []
-                    }
-                , applicationChildren      = []
-                }
-            )
+            (asMetaPattern metaNilSortList)
             (NamePrefix "#dummy")
             (TestedPatternSort sortListMetaSort)
             (SortVariablesThatMustBeDeclared [])

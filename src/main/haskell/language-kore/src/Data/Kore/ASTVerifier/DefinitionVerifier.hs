@@ -7,7 +7,9 @@ Maintainer  : virgil.serbanuta@runtimeverification.com
 Stability   : experimental
 Portability : POSIX
 -}
-module Data.Kore.ASTVerifier.DefinitionVerifier (verifyDefinition,
+module Data.Kore.ASTVerifier.DefinitionVerifier (implicitIndexedModule,
+                                                 verifyDefinition,
+                                                 verifyAndIndexDefinition,
                                                  verifyKoreDefinition,
                                                  AttributesVerification (..)) where
 
@@ -49,6 +51,14 @@ verifyDefinition
     -> KoreDefinition
     -> Either (Error VerifyError) VerifySuccess
 verifyDefinition attributesVerification definition = do
+    verifyAndIndexDefinition attributesVerification definition
+    verifySuccess
+
+verifyAndIndexDefinition
+    :: AttributesVerification
+    -> KoreDefinition
+    -> Either (Error VerifyError) (Map.Map ModuleName KoreIndexedModule)
+verifyAndIndexDefinition attributesVerification definition = do
     defaultNames <- verifyUniqueNames sortNames implicitModule
     foldM_ verifyUniqueNames defaultNames (definitionModules definition)
 
@@ -59,7 +69,7 @@ verifyDefinition attributesVerification definition = do
             (Map.singleton defaultModuleName defaultModuleWithMetaSorts)
             implicitModule
     let
-        implicitIndexedModule =
+        implicitIndexedModule1 =
             case
                 Map.lookup (moduleName implicitModule) implicitIndexedModules
             of
@@ -67,7 +77,7 @@ verifyDefinition attributesVerification definition = do
     indexedModules <-
         foldM
             (indexModuleIfNeeded
-                (ImplicitIndexedModule implicitIndexedModule)
+                (ImplicitIndexedModule implicitIndexedModule1)
                 nameToModule
             )
             implicitIndexedModules
@@ -75,9 +85,10 @@ verifyDefinition attributesVerification definition = do
     mapM_ (verifyModule attributesVerification) (Map.elems indexedModules)
     verifyAttributes
         (definitionAttributes definition)
-        implicitIndexedModule
+        implicitIndexedModule1
         Set.empty
         attributesVerification
+    return indexedModules
   where
     defaultModuleName = ModuleName "Default module"
     (moduleWithMetaSorts, sortNames) =
@@ -89,6 +100,15 @@ verifyDefinition attributesVerification definition = do
         Map.fromList
             (map (\m -> (moduleName m, m)) (definitionModules definition))
 
+implicitIndexedModule
+    :: Either
+        (Error VerifyError)
+        (IndexedModule UnifiedSortVariable FixedPattern Variable)
+implicitIndexedModule =
+    verifyKoreDefinition
+        DoNotVerifyAttributes
+        (definitionMetaToKore uncheckedKoreDefinition)
+
 {-|'verifyKoreDefinition' is meant to be used only in the
 'Data.Kore.Implicit' package. It verifies the correctness of a definition
 containing only the 'kore' default module.
@@ -96,7 +116,27 @@ containing only the 'kore' default module.
 verifyKoreDefinition
     :: AttributesVerification
     -> KoreDefinition
-    -> Either (Error VerifyError) VerifySuccess
-verifyKoreDefinition attributesVerification definition =
+    -> Either (Error VerifyError) KoreIndexedModule
+verifyKoreDefinition attributesVerification definition = do
     -- VerifyDefinition already checks the Kore module, so we skip it.
-    verifyDefinition attributesVerification definition { definitionModules = [] }
+    modules <-
+        verifyAndIndexDefinition
+            attributesVerification
+            definition { definitionModules = [] }
+    m <-
+        case definitionModules definition of
+            [] ->
+                koreFail
+                    (  "The kore implicit definition should have exactly"
+                    ++ " one module, but found none."
+                    )
+            [a] -> return a
+            _ ->
+                koreFail
+                    (  "The kore implicit definition should have exactly"
+                    ++ " one module, but found multiple ones."
+                    )
+    case Map.lookup (moduleName m) modules of
+        Just a -> return a
+        Nothing ->
+            koreFail "Internal error: the implicit kore module was not indexed."
