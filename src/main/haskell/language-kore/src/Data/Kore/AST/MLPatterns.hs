@@ -3,7 +3,7 @@
 {-# LANGUAGE Rank2Types     #-}
 {-|
 Module      : Data.Kore.MLPatterns
-Description : Classes for handling patterns in an uniform way.
+Description : Data structures and functions for handling patterns uniformly.
 Copyright   : (c) Runtime Verification, 2018
 License     : UIUC/NCSA
 Maintainer  : virgil.serbanuta@runtimeverification.com
@@ -12,8 +12,8 @@ Portability : portable
 -}
 module Data.Kore.AST.MLPatterns (MLPatternClass(..),
                                  MLBinderPatternClass (..),
-                                 PatternTransformer(..),
-                                 transformPattern) where
+                                 PatternFunction(..),
+                                 applyPatternFunction) where
 
 import           Data.Kore.AST.Common
 import           Data.Kore.AST.Kore
@@ -169,60 +169,67 @@ instance MLBinderPatternClass Forall where
         , forallChild = pat
         }
 
-data PatternTransformer level child result = PatternTransformer
-    { patternTransformerML
-        :: forall patt . MLPatternClass patt => patt level child -> result
-    , patternTransformerMLBinder
-        :: forall patt . MLBinderPatternClass patt
+{-|`PatternFunction` holds a full set of functions that
+can be applied to the elements of a `Pattern` (e.g. `Implies`). Together
+with `applyPatternFunction` they form a function on patterns, hence the name.
+-}
+data PatternFunction level child result = PatternFunction
+    { patternFunctionML
+        :: !(forall patt . MLPatternClass patt => patt level child -> result)
+    , patternFunctionMLBinder
+        :: !(forall patt . MLBinderPatternClass patt
         => patt level Variable child
-        -> result
-    , stringTransformer :: StringLiteral -> result
-    , charTransformer :: CharLiteral -> result
-    , applicationTransformer :: Application level child -> result
-    , variableTransformer :: Variable level -> result
+        -> result)
+    , stringFunction :: StringLiteral -> result
+    , charFunction :: CharLiteral -> result
+    , applicationFunction :: !(Application level child -> result)
+    , variableFunction :: !(Variable level -> result)
     }
 
-transformPattern
-    :: PatternTransformer level child result
+{-|`applyPatternFunction` applies a patternFuction on the inner element of a
+`Pattern`, returning the result.
+-}
+applyPatternFunction
+    :: PatternFunction level child result
     -> Pattern level Variable child
     -> result
-transformPattern transformer (AndPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (ApplicationPattern a) =
-    applicationTransformer transformer a
-transformPattern transformer (BottomPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (CeilPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (DomainValuePattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (EqualsPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (ExistsPattern a) =
-    patternTransformerMLBinder transformer a
-transformPattern transformer (FloorPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (ForallPattern a) =
-    patternTransformerMLBinder transformer a
-transformPattern transformer (IffPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (ImpliesPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (InPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (NextPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (NotPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (OrPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (RewritesPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (StringLiteralPattern a) =
-    stringTransformer transformer a
-transformPattern transformer (CharLiteralPattern a) =
-    charTransformer transformer a
-transformPattern transformer (TopPattern a) =
-    patternTransformerML transformer a
-transformPattern transformer (VariablePattern a) =
-    variableTransformer transformer a
+applyPatternFunction function (AndPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (ApplicationPattern a) =
+    applicationFunction function a
+applyPatternFunction function (BottomPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (CeilPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (DomainValuePattern a) =
+    patternFunctionML function a
+applyPatternFunction function (EqualsPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (ExistsPattern a) =
+    patternFunctionMLBinder function a
+applyPatternFunction function (FloorPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (ForallPattern a) =
+    patternFunctionMLBinder function a
+applyPatternFunction function (IffPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (ImpliesPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (InPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (NextPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (NotPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (OrPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (RewritesPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (StringLiteralPattern a) =
+    stringFunction function a
+applyPatternFunction function (CharLiteralPattern a) =
+    charFunction function a
+applyPatternFunction function (TopPattern a) =
+    patternFunctionML function a
+applyPatternFunction function (VariablePattern a) =
+    variableFunction function a

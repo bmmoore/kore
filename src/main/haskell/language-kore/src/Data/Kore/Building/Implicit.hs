@@ -1,19 +1,26 @@
+{-|
+Module      : Data.Kore.Building.Implicit
+Description : Builders for symbols and aliase that are implicitly defined in
+              Kore.
+Copyright   : (c) Runtime Verification, 2018
+License     : UIUC/NCSA
+Maintainer  : virgil.serbanuta@runtimeverification.com
+Stability   : experimental
+Portability : POSIX
+-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Data.Kore.Building.Implicit where
 
-import           Data.Kore.AST.Common        (Application (..), Id (..),
+import           Data.Kore.AST.Common        (Application (..), Id (..), Meta,
                                               Pattern (..), SymbolOrAlias (..))
-import           Data.Kore.AST.Kore
-import           Data.Kore.Building.AsAst
 import           Data.Kore.Building.Patterns
 import           Data.Kore.Building.Sorts
 
-data MetaNilSortList = MetaNilSortList
-instance AsAst UnifiedPattern MetaNilSortList where
-    asAst = MetaPattern . asMetaPattern
-instance AsMetaPattern MetaNilSortList where
-    asMetaPattern _ =
+data MetaNilSortListP sort level = MetaNilSortList
+type MetaNilSortList sort = MetaNilSortListP sort Meta
+instance ProperMetaPattern SortListSort MetaNilSortListP where
+    asProperMetaPattern _ =
         ApplicationPattern Application
             { applicationSymbolOrAlias = SymbolOrAlias
                 { symbolOrAliasConstructor = Id "#nilSortList"
@@ -21,6 +28,5 @@ instance AsMetaPattern MetaNilSortList where
                 }
             , applicationChildren      = []
             }
-instance MetaPattern SortListSort MetaNilSortList where
-metaNilSortList :: MetaNilSortList
+metaNilSortList :: MetaNilSortList SortListSort
 metaNilSortList = MetaNilSortList

@@ -207,15 +207,15 @@ psi1 :: MetaVariable CharListSort
 psi1 = metaVariable "#psi1" phiSort
 
 thingEqualsThing
-    :: (MetaSort s, MetaPattern s p) => s -> p -> MetaEquals CharListSort s p p
+    :: (MetaSort s, MetaPattern s p) => s -> p -> MetaEquals s p p CharListSort
 thingEqualsThing sort thing =
-    metaEquals (MetaResultSort phiSort) sort thing thing
+    metaEquals (ResultSort phiSort) sort thing thing
 xEqualsX
     :: MetaEquals
-        CharListSort
         MetaSortVariable1
         (MetaVariable MetaSortVariable1)
         (MetaVariable MetaSortVariable1)
+        CharListSort
 xEqualsX = thingEqualsThing xSort x
 phiSort :: CharListSort
 phiSort = CharListSort
@@ -556,8 +556,8 @@ variableSubstitutionTests =
                 (metaImplies xSort (metaForall xSort x x) y) (NewGoalId 1)
             , expectFailure
                 (testVariableSubstitution
-                    (SubstitutingVariable (asVariable y))
-                    (SubstitutedVariable (asVariable z))
+                    (SubstitutingVariable (asMetaVariable y))
+                    (SubstitutedVariable (asMetaVariable z))
                     x
                     (GoalId 1))
             ]
@@ -566,8 +566,8 @@ variableSubstitutionTests =
                 (metaImplies xSort (metaForall xSort x x) y) (NewGoalId 1)
             , expectFailure
                 (testVariableSubstitution
-                    (SubstitutingVariable (asVariable z))
-                    (SubstitutedVariable (asVariable x))
+                    (SubstitutingVariable (asMetaVariable z))
+                    (SubstitutedVariable (asMetaVariable x))
                     x
                     (GoalId 1))
             ]
@@ -584,8 +584,8 @@ variableSubstitutionTests =
                 (NewGoalId 1)
             , expectFailure
                 (testVariableSubstitution
-                    (SubstitutingVariable (asVariable y))
-                    (SubstitutedVariable (asVariable x))
+                    (SubstitutingVariable (asMetaVariable y))
+                    (SubstitutedVariable (asMetaVariable x))
                     (metaForall xSort y (metaImplies xSort x y))
                     (GoalId 1))
             ]
@@ -593,8 +593,8 @@ variableSubstitutionTests =
             [ testAddGoal
                 (metaImplies xSort (metaForall xSort x x) y) (NewGoalId 1)
             , testVariableSubstitution
-                (SubstitutingVariable (asVariable y))
-                (SubstitutedVariable (asVariable x))
+                (SubstitutingVariable (asMetaVariable y))
+                (SubstitutedVariable (asMetaVariable x))
                 x
                 (GoalId 1)
             ]
@@ -2546,7 +2546,7 @@ testForall
     , forallRule var1 pat1 pat2 conclusion
     )
   where
-    var1 = asVariable variable
+    var1 = asMetaVariable variable
     pat1 = asAst phi1p
     pat2 = asAst phi2p
 
@@ -2562,7 +2562,7 @@ testGeneralization variable phiId conclusionId =
     , generalization var phiId conclusionId
     )
   where
-    var = asVariable variable
+    var = asMetaVariable variable
 
 testPropagateOr
     :: (AsAst UnifiedPattern p1, AsAst UnifiedPattern p2)
@@ -2600,7 +2600,7 @@ testPropagateExists symbol idx variable phip conclusionId =
     )
   where
     pat = asAst phip
-    var = asVariable variable
+    var = asMetaVariable variable
 
 testNecessitation
     :: SymbolOrAlias Meta
@@ -2625,7 +2625,7 @@ testExistence variable conclusionId =
     , existence var conclusionId
     )
   where
-    var = asVariable variable
+    var = asMetaVariable variable
 
 testSingvar
     :: (MetaSort s, AsAst UnifiedPattern p1)
@@ -2644,7 +2644,7 @@ testSingvar variable phip path1 path2 conclusionId =
     , singvar var pat path1 path2 conclusionId
     )
   where
-    var = asVariable variable
+    var = asMetaVariable variable
     pat = asAst phip
 
 assertGoalCount :: Int -> (String, MLProof -> Either String MLProof)

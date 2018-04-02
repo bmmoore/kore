@@ -1,63 +1,81 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-|
+Module      : Data.Kore.Building.Sorts
+Description : Builders for meta sorts and sort variables.
+Copyright   : (c) Runtime Verification, 2018
+License     : UIUC/NCSA
+Maintainer  : virgil.serbanuta@runtimeverification.com
+Stability   : experimental
+Portability : POSIX
+-}
 module Data.Kore.Building.Sorts where
 
 import           Data.Kore.AST.Common
 import           Data.Kore.Building.AsAst
 import           Data.Kore.Implicit.ImplicitSorts
 
-class AsAst (Sort Meta) a => MetaSort a where
+class AsAst (Sort Meta) sort => MetaSort sort where
+class AsAst (Sort Object) sort => ObjectSort sort where
 
-class AsAst (Sort Object) a => ObjectSort a where
+instance AsAst (Sort Meta) (sort Meta) => MetaSort (sort Meta) where
+instance AsAst (Sort Object) (sort Object) => ObjectSort (sort Object) where
 
-data CharSort = CharSort
+data CharSortP level where CharSort :: CharSort
+type CharSort = CharSortP Meta
 instance AsAst (Sort Meta) CharSort where
     asAst _ = charMetaSort
-instance MetaSort CharSort where
 
-data CharListSort = CharListSort
+data CharListSortP level where CharListSort :: CharListSort
+type CharListSort = CharListSortP Meta
 instance AsAst (Sort Meta) CharListSort where
     asAst _ = charListMetaSort
-instance MetaSort CharListSort where
 
-data PatternSort = PatternSort
+data PatternSortP level where PatternSort :: PatternSort
+type PatternSort = PatternSortP Meta
 instance AsAst (Sort Meta) PatternSort where
     asAst _ = patternMetaSort
-instance MetaSort PatternSort where
 
-data PatternListSort = PatternListSort
+data PatternListSortP level where PatternListSort :: PatternListSort
+type PatternListSort = PatternListSortP Meta
 instance AsAst (Sort Meta) PatternListSort where
     asAst _ = patternListMetaSort
-instance MetaSort PatternListSort where
 
-data SortSort = SortSort
+data SortSortP level where SortSort :: SortSort
+type SortSort = SortSortP Meta
 instance AsAst (Sort Meta) SortSort where
     asAst _ = sortMetaSort
-instance MetaSort SortSort where
 
-data SortListSort = SortListSort
+data SortListSortP level where SortListSort :: SortListSort
+type SortListSort = SortListSortP Meta
 instance AsAst (Sort Meta) SortListSort where
     asAst _ = sortListMetaSort
-instance MetaSort SortListSort where
 
-data VariableSort = VariableSort
+data VariableSortP level where VariableSort :: VariableSort
+type VariableSort = VariableSortP Meta
 instance AsAst (Sort Meta) VariableSort where
     asAst _ = variableMetaSort
-instance MetaSort VariableSort where
 
-data VariableListSort = VariableListSort
+data VariableListSortP level where VariableListSort :: VariableListSort
+type VariableListSort = VariableListSortP Meta
 instance AsAst (Sort Meta) VariableListSort where
     asAst _ = variableListMetaSort
-instance MetaSort VariableListSort where
 
--- TODO: rename.
-newtype MetaSortVariable1 = MetaSortVariable1 String
+-- TODO(virgil): rename. Also, it is likely that each variable should have sort
+-- distinct type.
+data MetaSortVariable1P level where
+    MetaSortVariable1 :: !String -> MetaSortVariable1
+type MetaSortVariable1 = MetaSortVariable1P Meta
 instance AsAst (Sort Meta) MetaSortVariable1 where
-    asAst (MetaSortVariable1 name) = SortVariableSort (SortVariable (Id name))
-instance MetaSort MetaSortVariable1 where
+    asAst v = SortVariableSort (asMetaSortVariable v)
+asMetaSortVariable :: MetaSortVariable1 -> SortVariable Meta
+asMetaSortVariable (MetaSortVariable1 name) = SortVariable (Id name)
 
-newtype ObjectSortVariable1 = ObjectSortVariable1 String
+data ObjectSortVariable1P level where
+    ObjectSortVariable1 :: !String -> ObjectSortVariable1
+type ObjectSortVariable1 = ObjectSortVariable1P Meta
 instance AsAst (Sort Object) ObjectSortVariable1 where
     asAst (ObjectSortVariable1 name) = SortVariableSort (SortVariable (Id name))
-instance ObjectSort ObjectSortVariable1

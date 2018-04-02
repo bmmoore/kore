@@ -40,10 +40,7 @@ import qualified Data.Set                               as Set
 type Var = Variable Meta
 type Symbol = SymbolOrAlias Meta
 
--- To get an indexed module one can use sometihng like this:
--- case implicitIndexedModule of
---     Left err -> error (printError err)
---     Right m  -> m
+-- To get an indexed module one can use `verifyAndIndexDefinition`
 formulaVerifier
     :: IndexedModule UnifiedSortVariable FixedPattern Variable
     -> CommonMetaPattern
@@ -60,6 +57,8 @@ formulaVerifier indexedModule formula = do
   where
     unifiedFormula = patternMetaToKore (SentenceMetaPattern formula)
 
+-- TODO(virgil): Check that symbols and not aliases are used in a few places
+-- like checkSingvar
 instance ProofSystem
         MLError
         (MLRule

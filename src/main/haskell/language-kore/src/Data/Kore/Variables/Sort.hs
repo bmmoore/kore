@@ -69,18 +69,18 @@ addPatternSortVariables
     -> Set.Set sortvar
     -> Set.Set sortvar
 addPatternSortVariables pattern1 addSortVariables1 existing =
-    transformPattern
-        PatternTransformer
-            { patternTransformerML =
+    applyPatternFunction
+        PatternFunction
+            { patternFunctionML =
                 \a -> addMLPatternSortVariables a addSortVariables1 existing
-            , patternTransformerMLBinder =
+            , patternFunctionMLBinder =
                 \a -> addBinderPatternSortVariables a addSortVariables1 existing
-            , stringTransformer = const existing
-            , charTransformer = const existing
-            , applicationTransformer =
+            , stringFunction = const existing
+            , charFunction = const existing
+            , applicationFunction =
                 \a -> addApplicationPatternSortVariables
                     a addSortVariables1 existing
-            , variableTransformer =
+            , variableFunction =
                 \a -> addVariableSort a addSortVariables1 existing
             }
         pattern1

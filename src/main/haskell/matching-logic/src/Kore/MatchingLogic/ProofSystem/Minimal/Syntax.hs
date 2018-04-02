@@ -142,7 +142,8 @@ instance (Pretty sort, Pretty label, Pretty var, Pretty term, Pretty hyp)
     Propositional3 p1 p2 -> rule "propositional3" [pretty p1, pretty p2]
     ModusPonens h1 h2 -> rule "mp" [pretty h1,pretty h2]
     Generalization v h -> rule "ug" [pretty v,pretty h]
-    VariableSubstitution (SubstitutedVariable x) h (SubstitutingVariable y) -> rule "varsubst" [pretty x,pretty h,pretty y]
+    VariableSubstitution (SubstitutedVariable x) h (SubstitutingVariable y) ->
+      rule "varsubst" [pretty x,pretty h,pretty y]
     Forall v p1 p2 -> rule "forall" [pretty v,pretty p1,pretty p2]
     Necessitation lbl pos h -> rule "necessitation" [pretty lbl,pretty pos,pretty h]
     PropagateOr lbl pos p1 p2 -> rule "propagate-or" [pretty lbl,pretty pos,pretty p1,pretty p2]

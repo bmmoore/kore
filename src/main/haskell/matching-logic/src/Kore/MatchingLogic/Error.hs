@@ -12,7 +12,6 @@ module Kore.MatchingLogic.Error where
 import           Data.Kore.Error
 
 import           Data.Text.Prettyprint.Doc
-import           Data.Text.Prettyprint.Doc.Render.Text (renderLazy)
 
 {-| 'MLError' is a tag for errors related to matching logic. -}
 newtype MLError = MLError ()
@@ -28,7 +27,6 @@ mlSuccess = Right (MLSuccess ())
 mlFailWhen :: Bool -> [Doc ann] -> Either (Error a) ()
 mlFailWhen condition docs =
     koreFailWhen condition (show (concatWith (<>) docs))
---    koreFailWhen condition (unpack (renderLazy (concatWith <> doc)))
 
 mlFail :: [Doc ann] -> Either (Error a) b
 mlFail docs =

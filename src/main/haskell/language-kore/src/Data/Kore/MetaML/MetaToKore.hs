@@ -29,8 +29,6 @@ patternMetaToKore = cata MetaPattern . getSentenceMetaPattern
 patternKoreToMeta :: UnifiedPattern -> MetaMLPattern Variable
 patternKoreToMeta = bottomUpVisitor extractMetaPattern
 
--- MetaPattern !(Pattern Meta variable (FixedPattern variable))
-
 extractMetaPattern
     :: MetaOrObject level
     => Pattern level Variable (MetaMLPattern Variable)

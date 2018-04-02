@@ -7,8 +7,7 @@ Maintainer  : virgil.serbanuta@runtimeverification.com
 Stability   : experimental
 Portability : POSIX
 -}
-module Data.Kore.ASTVerifier.DefinitionVerifier (implicitIndexedModule,
-                                                 verifyDefinition,
+module Data.Kore.ASTVerifier.DefinitionVerifier (verifyDefinition,
                                                  verifyAndIndexDefinition,
                                                  verifyKoreDefinition,
                                                  AttributesVerification (..)) where
@@ -54,6 +53,9 @@ verifyDefinition attributesVerification definition = do
     verifyAndIndexDefinition attributesVerification definition
     verifySuccess
 
+{-|'verifyAndIndexDefinition' verifies a definition and returns an indexed
+collection of the definition's modules.
+-}
 verifyAndIndexDefinition
     :: AttributesVerification
     -> KoreDefinition
@@ -69,7 +71,7 @@ verifyAndIndexDefinition attributesVerification definition = do
             (Map.singleton defaultModuleName defaultModuleWithMetaSorts)
             implicitModule
     let
-        implicitIndexedModule1 =
+        implicitIndexedModule =
             case
                 Map.lookup (moduleName implicitModule) implicitIndexedModules
             of
@@ -77,7 +79,7 @@ verifyAndIndexDefinition attributesVerification definition = do
     indexedModules <-
         foldM
             (indexModuleIfNeeded
-                (ImplicitIndexedModule implicitIndexedModule1)
+                (ImplicitIndexedModule implicitIndexedModule)
                 nameToModule
             )
             implicitIndexedModules
@@ -85,7 +87,7 @@ verifyAndIndexDefinition attributesVerification definition = do
     mapM_ (verifyModule attributesVerification) (Map.elems indexedModules)
     verifyAttributes
         (definitionAttributes definition)
-        implicitIndexedModule1
+        implicitIndexedModule
         Set.empty
         attributesVerification
     return indexedModules
@@ -99,15 +101,6 @@ verifyAndIndexDefinition attributesVerification definition = do
     nameToModule =
         Map.fromList
             (map (\m -> (moduleName m, m)) (definitionModules definition))
-
-implicitIndexedModule
-    :: Either
-        (Error VerifyError)
-        (IndexedModule UnifiedSortVariable FixedPattern Variable)
-implicitIndexedModule =
-    verifyKoreDefinition
-        DoNotVerifyAttributes
-        (definitionMetaToKore uncheckedKoreDefinition)
 
 {-|'verifyKoreDefinition' is meant to be used only in the
 'Data.Kore.Implicit' package. It verifies the correctness of a definition

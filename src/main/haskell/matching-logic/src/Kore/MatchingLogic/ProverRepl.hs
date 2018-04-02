@@ -11,23 +11,14 @@ a particular instance of 'HilbertProof'.
 -}
 module Kore.MatchingLogic.ProverRepl where
 
-import           Kore.MatchingLogic.Error
 import           Kore.MatchingLogic.HilbertProof
 
-import           Data.Kore.ASTVerifier.DefinitionVerifier (implicitIndexedModule)
 import           Data.Kore.Error
 
-import           Control.Monad.IO.Class                   (liftIO)
-import           Control.Monad.State.Strict               (MonadState (..),
-                                                           StateT, execStateT,
-                                                           modify')
-import           Control.Monad.Trans                      (MonadTrans (lift))
-import           Data.List                                (isPrefixOf,
-                                                           isSuffixOf)
-import qualified Data.Map.Strict                          as Map
-import           Data.Text                                (Text, pack)
-import           Data.Text.Prettyprint.Doc                (Pretty (pretty),
-                                                           colon, (<+>))
+import           Control.Monad.State.Strict      (MonadState (..), execStateT)
+import           Control.Monad.Trans             (MonadTrans (lift))
+import           Data.Text                       (Text, pack)
+import           Data.Text.Prettyprint.Doc       (Pretty (pretty), colon, (<+>))
 import           Data.Void
 import           System.Console.Haskeline
 import           Text.Megaparsec
