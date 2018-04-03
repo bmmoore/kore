@@ -21,7 +21,7 @@ import           Data.Text.Prettyprint.Doc              (Doc, Pretty (pretty),
                                                          sep, tupled, (<>))
 import qualified Data.Text.Prettyprint.Doc              as Doc
 import           Data.Void
-import           Text.Megaparsec
+import           Text.Megaparsec                        hiding (some)
 import           Text.Megaparsec.Char
 
 import           Kore.MatchingLogic.AST.Syntax          (mlPattern)

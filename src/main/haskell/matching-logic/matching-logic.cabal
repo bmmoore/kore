@@ -90,4 +90,8 @@ test-suite test
     , tasty-golden
     , tasty-hunit
     , tasty-quickcheck
+    , text
+    , megaparsec
+  other-modules:
+      RuleParserTests
   default-language: Haskell2010
