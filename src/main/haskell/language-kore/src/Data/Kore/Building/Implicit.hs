@@ -17,10 +17,9 @@ import           Data.Kore.AST.Common        (Application (..), Id (..), Meta,
 import           Data.Kore.Building.Patterns
 import           Data.Kore.Building.Sorts
 
-data MetaNilSortListP sort level = MetaNilSortList
-type MetaNilSortList sort = MetaNilSortListP sort Meta
-instance ProperMetaPattern SortListSort MetaNilSortListP where
-    asProperMetaPattern _ =
+data MetaNilSortList = MetaNilSortList
+instance ProperPattern Meta SortListSort MetaNilSortList where
+    asProperPattern _ =
         ApplicationPattern Application
             { applicationSymbolOrAlias = SymbolOrAlias
                 { symbolOrAliasConstructor = Id "#nilSortList"
@@ -28,5 +27,5 @@ instance ProperMetaPattern SortListSort MetaNilSortListP where
                 }
             , applicationChildren      = []
             }
-metaNilSortList :: MetaNilSortList SortListSort
+metaNilSortList :: MetaNilSortList
 metaNilSortList = MetaNilSortList

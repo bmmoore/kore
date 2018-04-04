@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MonoLocalBinds #-}
+-- to suppress warnings about the simplifiable instance (AsAst UnifiedPattern _)
 module Kore.MatchingLogic.ProofSystem.ProofAssistantTest
     (proofAssistantTests) where
 
@@ -770,9 +772,9 @@ data MetaSigmaP p1 p2 p3 s level = MetaSigma
     }
 type MetaSigma p1 p2 p3 s = MetaSigmaP p1 p2 p3 s Meta
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => ProperMetaPattern s (MetaSigmaP p1 p2 p3)
+    => ProperPattern Meta s (MetaSigma s p1 p2 p3)
   where
-    asProperMetaPattern (MetaSigma _ p1 p2 p3) =
+    asProperPattern (MetaSigma _ p1 p2 p3) =
         ApplicationPattern Application
             { applicationSymbolOrAlias = sigmaSymbol
             , applicationChildren = [asAst p1, asAst p2, asAst p3]
@@ -821,9 +823,9 @@ data MetaSigmoidP p1 p2 p3 s level = MetaSigmoid
     }
 type MetaSigmoid p1 p2 p3 s = MetaSigmoidP p1 p2 p3 s Meta
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => ProperMetaPattern s (MetaSigmoidP p1 p2 p3)
+    => ProperPattern Meta s (MetaSigmoid s p1 p2 p3)
   where
-    asProperMetaPattern (MetaSigmoid _ p1 p2 p3) =
+    asProperPattern (MetaSigmoid _ p1 p2 p3) =
         ApplicationPattern Application
             { applicationSymbolOrAlias = SymbolOrAlias
                 { symbolOrAliasConstructor = sigmoidId
