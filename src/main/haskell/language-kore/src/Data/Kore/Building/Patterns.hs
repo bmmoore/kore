@@ -38,15 +38,13 @@ class ProperObjectPattern sort patt where
     asProperObjectPattern
         :: patt sort Object -> Pattern Object Variable UnifiedPattern
 
-class AsAst UnifiedPattern patt => MetaPattern sort patt where
-
 class AsAst UnifiedPattern patt => AsMetaPattern patt where
     asMetaPattern :: patt -> Pattern Meta Variable UnifiedPattern
-
 class AsAst UnifiedPattern patt => AsObjectPattern patt where
     asObjectPattern :: patt -> Pattern Object Variable UnifiedPattern
 
 class AsAst UnifiedPattern patt => ObjectPattern sort patt where
+class AsAst UnifiedPattern patt => MetaPattern sort patt where
 
 -------------------------------------
 
