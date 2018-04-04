@@ -764,12 +764,13 @@ forallTests =
                 ]
         ]
 
-data MetaSigma s p1 p2 p3 = MetaSigma
+data MetaSigmaP p1 p2 p3 s level = MetaSigma
     { metaSigmaSort   :: s
     , metaSigmaFirst  :: p1
     , metaSigmaSecond :: p2
     , metaSigmaThird  :: p3
     }
+type MetaSigma p1 p2 p3 s = MetaSigmaP p1 p2 p3 s Meta
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
     => ProperPattern Meta s (MetaSigma s p1 p2 p3)
   where
@@ -778,27 +779,19 @@ instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
             { applicationSymbolOrAlias = sigmaSymbol
             , applicationChildren = [asAst p1, asAst p2, asAst p3]
             }
-{-
-instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => AsAst UnifiedPattern (MetaSigma s p1 p2 p3)
-  where
-    asAst = MetaPattern . asMetaPattern
-instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => MetaPattern s (MetaSigma s p1 p2 p3) where
-  -}
 metaSigma
     :: (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => s -> p1 -> p2 -> p3 -> MetaSigma s p1 p2 p3
+    => s -> p1 -> p2 -> p3 -> MetaSigma p1 p2 p3 s
 metaSigma = MetaSigma
 
 sigma2
     :: MetaPattern CharListSort p1
     => p1
     -> MetaSigma
-        CharListSort
         (MetaVariable CharListSort)
         p1
         (MetaVariable CharListSort)
+        CharListSort
 sigma2 phip = sigma2p phip psi1
 
 sigma2p
@@ -806,28 +799,29 @@ sigma2p
     => p1
     -> p2
     -> MetaSigma
-        CharListSort
         p2
         p1
         p2
+        CharListSort
 sigma2p phip psip = metaSigma phiSort psip phip psip
 
 sigma3
     :: MetaPattern CharListSort p1
     => p1
     -> MetaSigma
-        CharListSort
         (MetaVariable CharListSort)
         (MetaVariable CharListSort)
         p1
+        CharListSort
 sigma3 = metaSigma phiSort psi1 psi1
 
-data MetaSigmoid s p1 p2 p3 = MetaSigmoid
+data MetaSigmoidP p1 p2 p3 s level = MetaSigmoid
     { metaSigmoidSort   :: s
     , metaSigmoidFirst  :: p1
     , metaSigmoidSecond :: p2
     , metaSigmoidThird  :: p3
     }
+type MetaSigmoid p1 p2 p3 s = MetaSigmoidP p1 p2 p3 s Meta
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
     => ProperPattern Meta s (MetaSigmoid s p1 p2 p3)
   where
@@ -841,17 +835,17 @@ instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
             }
 metaSigmoid
     :: (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => s -> p1 -> p2 -> p3 -> MetaSigmoid s p1 p2 p3
+    => s -> p1 -> p2 -> p3 -> MetaSigmoid p1 p2 p3 s
 metaSigmoid = MetaSigmoid
 
 sigmoid2
     :: MetaPattern CharListSort p1
     => p1
     -> MetaSigmoid
-        CharListSort
         (MetaVariable CharListSort)
         p1
         (MetaVariable CharListSort)
+        CharListSort
 sigmoid2 phip = sigmoid2p phip psi1
 
 sigmoid2p
@@ -859,10 +853,10 @@ sigmoid2p
     => p1
     -> p2
     -> MetaSigmoid
-        CharListSort
         p2
         p1
         p2
+        CharListSort
 sigmoid2p phip psip = metaSigmoid phiSort psip phip psip
 
 sigmaId :: Id Meta

@@ -50,15 +50,13 @@ asProperMetaPattern :: (ProperPattern Meta sort patt) =>
   patt -> Pattern Meta Variable UnifiedPattern
 asProperMetaPattern = asProperPattern
 
-class AsAst UnifiedPattern patt => MetaPattern sort patt where
-
 class AsAst UnifiedPattern patt => AsMetaPattern patt where
     asMetaPattern :: patt -> Pattern Meta Variable UnifiedPattern
-
 class AsAst UnifiedPattern patt => AsObjectPattern patt where
     asObjectPattern :: patt -> Pattern Object Variable UnifiedPattern
 
 class AsAst UnifiedPattern patt => ObjectPattern sort patt where
+class AsAst UnifiedPattern patt => MetaPattern sort patt where
 
 -------------------------------------
 
