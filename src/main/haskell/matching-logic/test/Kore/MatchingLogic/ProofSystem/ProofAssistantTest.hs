@@ -762,26 +762,21 @@ forallTests =
                 ]
         ]
 
-data MetaSigma s p1 p2 p3 = MetaSigma
+data MetaSigmaP s p1 p2 p3 level = MetaSigma
     { metaSigmaSort   :: s
     , metaSigmaFirst  :: p1
     , metaSigmaSecond :: p2
     , metaSigmaThird  :: p3
     }
+type MetaSigma = MetaSigmaP Meta
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => AsMetaPattern (MetaSigma s p1 p2 p3)
+    => ProperMetaPattern s (MetaSigma s p1 p2 p3)
   where
-    asMetaPattern (MetaSigma _ p1 p2 p3) =
+    asProperMetaPattern (MetaSigma _ p1 p2 p3) =
         ApplicationPattern Application
             { applicationSymbolOrAlias = sigmaSymbol
             , applicationChildren = [asAst p1, asAst p2, asAst p3]
             }
-instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => AsAst UnifiedPattern (MetaSigma s p1 p2 p3)
-  where
-    asAst = MetaPattern . asMetaPattern
-instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => MetaPattern s (MetaSigma s p1 p2 p3) where
 metaSigma
     :: (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
     => s -> p1 -> p2 -> p3 -> MetaSigma s p1 p2 p3
@@ -818,16 +813,17 @@ sigma3
         p1
 sigma3 = metaSigma phiSort psi1 psi1
 
-data MetaSigmoid s p1 p2 p3 = MetaSigmoid
+data MetaSigmoidP s p1 p2 p3 level = MetaSigmoid
     { metaSigmoidSort   :: s
     , metaSigmoidFirst  :: p1
     , metaSigmoidSecond :: p2
     , metaSigmoidThird  :: p3
     }
+type MetaSigmoid = MetaSigmoidP Meta
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => AsMetaPattern (MetaSigmoid s p1 p2 p3)
+    => ProperMetaPattern (MetaSigmoid s p1 p2 p3)
   where
-    asMetaPattern (MetaSigmoid _ p1 p2 p3) =
+    asProperMetaPattern (MetaSigmoid _ p1 p2 p3) =
         ApplicationPattern Application
             { applicationSymbolOrAlias = SymbolOrAlias
                 { symbolOrAliasConstructor = sigmoidId
@@ -835,12 +831,6 @@ instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
                 }
             , applicationChildren = [asAst p1, asAst p2, asAst p3]
             }
-instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => AsAst UnifiedPattern (MetaSigmoid s p1 p2 p3)
-  where
-    asAst = MetaPattern . asMetaPattern
-instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => MetaPattern s (MetaSigmoid s p1 p2 p3) where
 metaSigmoid
     :: (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
     => s -> p1 -> p2 -> p3 -> MetaSigmoid s p1 p2 p3
