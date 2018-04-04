@@ -2,6 +2,10 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE FunctionalDependencies  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE GADTs #-}
 {-|
 Module      : Data.Kore.Building.Patterns
 Description : Builders for the standard Kore patterns, without 'Application'.
@@ -21,8 +25,10 @@ import           Data.Kore.AST.Common     (And (..), Bottom (..), Ceil (..),
                                            Next (..), Not (..), Object, Or (..),
                                            Pattern (..), Rewrites (..),
                                            StringLiteral (..), Top (..),
-                                           Variable (..))
+                                           Variable (..),
+                                           Sort)
 import           Data.Kore.AST.Kore       (FixedPattern (..), UnifiedPattern)
+import           Data.Kore.AST.MetaOrObject
 import           Data.Kore.Building.AsAst
 import           Data.Kore.Building.Sorts
 
@@ -31,12 +37,18 @@ users are expected to instantiate either
 `ProperMetaPattern` or `ProperObjectPattern`, the other derivations
 (e.g. for `MetaPattern` and `AsAst`) being inferred automatically.
 -}
-class ProperMetaPattern sort patt where
-    asProperMetaPattern
-        :: patt sort Meta -> Pattern Meta Variable UnifiedPattern
-class ProperObjectPattern sort patt where
-    asProperObjectPattern
-        :: patt sort Object -> Pattern Object Variable UnifiedPattern
+class MetaOrObject level => ProperPattern level sort patt | patt -> sort level where
+    asProperPattern
+        :: patt -> Pattern level Variable UnifiedPattern
+type ProperMetaPattern = ProperPattern Meta
+type ProperObjectPattern = ProperPattern Object
+
+asProperObjectPattern :: (ProperPattern Object sort patt) =>
+  patt -> Pattern Object Variable UnifiedPattern
+asProperObjectPattern = asProperPattern
+asProperMetaPattern :: (ProperPattern Meta sort patt) =>
+  patt -> Pattern Meta Variable UnifiedPattern
+asProperMetaPattern = asProperPattern
 
 class AsAst UnifiedPattern patt => MetaPattern sort patt where
 
@@ -50,28 +62,25 @@ class AsAst UnifiedPattern patt => ObjectPattern sort patt where
 
 -------------------------------------
 
-instance ProperMetaPattern sort patt => AsAst UnifiedPattern (patt sort Meta)
+instance forall level sort patt . (ProperPattern level sort patt)
+         => AsAst UnifiedPattern patt
   where
-    asAst = MetaPattern . asProperMetaPattern
-instance ProperMetaPattern sort patt => MetaPattern sort (patt sort Meta) where
-instance ProperMetaPattern sort patt => AsMetaPattern (patt sort Meta) where
+    asAst pat = case isMetaOrObject (undefined :: level) of
+      IsMeta -> MetaPattern (asProperMetaPattern pat)
+      IsObject -> ObjectPattern (asProperObjectPattern pat)
+
+instance ProperMetaPattern sort patt => MetaPattern sort patt where
+instance ProperMetaPattern sort patt => AsMetaPattern patt where
     asMetaPattern = asProperMetaPattern
-instance ProperMetaPattern PatternSort patt
-    => ObjectPattern a (patt PatternSort Meta) where
+instance ProperPattern level PatternSort patt
+    => ObjectPattern a patt where
 
 instance ProperObjectPattern sort patt
-    => AsAst UnifiedPattern (patt sort Object)
-  where
-    asAst = ObjectPattern . asProperObjectPattern
-instance ProperObjectPattern sort patt
-    => ObjectPattern sort (patt sort Object)
-  where
-instance ProperObjectPattern sort patt
-    => AsObjectPattern (patt sort Object)
+    => AsObjectPattern patt
   where
     asObjectPattern = asProperObjectPattern
 instance (ProperObjectPattern sort patt)
-    => MetaPattern PatternSort (patt sort Object)
+    => MetaPattern PatternSort patt
   where
 
 -------------------------------------
@@ -86,25 +95,22 @@ data PatternAnd pattern1 pattern2 sort level = PatternAnd
     , patternAndFirst  :: pattern1
     , patternAndSecond :: pattern2
     }
+instance ( MetaOrObject level
+         , AsSort level sort
+         , ProperPattern level sort pattern1
+         , ProperPattern level sort pattern2)
+    => ProperPattern level sort (PatternAnd pattern1 pattern2 sort level)
+  where
+    asProperPattern (PatternAnd sort first second) =
+        AndPattern (And (asAst sort) (asAst first) (asAst second))
 
 type MetaAnd pattern1 pattern2 sort = PatternAnd pattern1 pattern2 sort Meta
-instance (MetaSort sort, MetaPattern sort pattern1, MetaPattern sort pattern2)
-    => ProperMetaPattern sort (PatternAnd pattern1 pattern2)
-  where
-    asProperMetaPattern (PatternAnd sort first second) =
-        AndPattern (And (asAst sort) (asAst first) (asAst second))
 metaAnd
     :: (MetaSort sort, MetaPattern sort pattern1, MetaPattern sort pattern2)
     => sort -> pattern1 -> pattern2 -> MetaAnd pattern1 pattern2 sort
 metaAnd = PatternAnd
 
 type ObjectAnd pattern1 pattern2 sort = PatternAnd pattern1 pattern2 sort Object
-instance
-    (ObjectSort sort, ObjectPattern sort pattern1, ObjectPattern sort pattern2)
-    => ProperObjectPattern sort (PatternAnd pattern1 pattern2)
-  where
-    asProperObjectPattern (PatternAnd sort first second) =
-        AndPattern (And (asAst sort) (asAst first) (asAst second))
 objectAnd
     ::  ( ObjectSort sort
         , ObjectPattern sort pattern1
@@ -116,19 +122,17 @@ objectAnd = PatternAnd
 
 newtype PatternBottom sort level = PatternBottom
     { patternBottomSort :: sort }
+instance (MetaOrObject level, AsSort level sort) =>
+          ProperPattern level sort (PatternBottom sort level)
+  where
+    asProperPattern (PatternBottom sort) =
+        BottomPattern (Bottom (asAst sort))
 
 type MetaBottom sort = PatternBottom sort Meta
-instance MetaSort sort => ProperMetaPattern sort PatternBottom where
-    asProperMetaPattern (PatternBottom sort) =
-        BottomPattern (Bottom (asAst sort))
 metaBottom :: (MetaSort sort) => sort -> MetaBottom sort
 metaBottom = PatternBottom
 
 type ObjectBottom sort = PatternBottom sort Object
-instance ObjectSort sort => ProperObjectPattern sort PatternBottom
-  where
-    asProperObjectPattern (PatternBottom sort) =
-        BottomPattern (Bottom (asAst sort))
 objectBottom :: ObjectSort sort => sort -> ObjectBottom sort
 objectBottom = PatternBottom
 
@@ -139,16 +143,14 @@ data PatternCeil childSort child resultSort level = PatternCeil
     , patternCeilOperandSort :: childSort
     , patternCeilChild       :: child
     }
-
-type MetaCeil childSort child resultSort =
-    PatternCeil childSort child resultSort Meta
 instance
-    ( MetaSort resultSort
-    , MetaSort childSort
-    , MetaPattern childSort child)
-    => ProperMetaPattern resultSort (PatternCeil childSort child)
+    ( MetaOrObject level
+    , AsSort level resultSort
+    , AsSort level childSort
+    , ProperPattern level childSort child)
+    => ProperPattern level resultSort (PatternCeil childSort child resultSort level)
   where
-    asProperMetaPattern
+    asProperPattern
         (PatternCeil (ResultSort resultSort) operandSort child)
       =
         CeilPattern Ceil
@@ -156,6 +158,9 @@ instance
             , ceilResultSort  = asAst resultSort
             , ceilChild       = asAst child
             }
+
+type MetaCeil childSort child resultSort =
+    PatternCeil childSort child resultSort Meta
 metaCeil
     ::  ( MetaSort resultSort
         , MetaSort childSort
@@ -169,20 +174,6 @@ metaCeil = PatternCeil
 
 type ObjectCeil childSort child resultSort =
     PatternCeil childSort child resultSort Object
-instance
-    ( ObjectSort resultSort
-    , ObjectSort childSort
-    , ObjectPattern childSort child)
-    => ProperObjectPattern resultSort (PatternCeil childSort child)
-  where
-    asProperObjectPattern
-        (PatternCeil (ResultSort resultSort) operandSort child)
-      =
-        CeilPattern Ceil
-            { ceilOperandSort = asAst operandSort
-            , ceilResultSort  = asAst resultSort
-            , ceilChild       = asAst child
-            }
 objectCeil
     ::  ( ObjectSort resultSort
         , ObjectSort childSort
@@ -196,22 +187,21 @@ objectCeil = PatternCeil
 
 -------------------------------------
 
-data PatternDomainValue pattern1 sort level = PatternDomainValue
+data ObjectDomainValue pattern1 sort = ObjectDomainValue
     { patternDomainValueSort  :: sort
     , patternDomainValueChild :: pattern1
     }
 
-type ObjectDomainValue pattern1 sort = PatternDomainValue pattern1 sort Object
 instance
     (ObjectSort sort, MetaPattern CharListSort pattern1)
-    => ProperObjectPattern sort (PatternDomainValue pattern1)
+    => ProperPattern Object sort (ObjectDomainValue pattern1 sort)
   where
-    asProperObjectPattern (PatternDomainValue sort child) =
+    asProperPattern (ObjectDomainValue sort child) =
         DomainValuePattern (DomainValue (asAst sort) (asAst child))
 objectDomainValue
     :: (ObjectSort sort, MetaPattern CharListSort pattern1)
     => sort -> pattern1 -> ObjectDomainValue pattern1 sort
-objectDomainValue = PatternDomainValue
+objectDomainValue = ObjectDomainValue
 
 -------------------------------------
 
@@ -221,17 +211,17 @@ data PatternEquals childSort pattern1 pattern2 resultSort level = PatternEquals
     , patternEqualsFirst       :: pattern1
     , patternEqualsSecond      :: pattern2
     }
-
-type MetaEquals childSort pattern1 pattern2 resultSort =
-    PatternEquals childSort pattern1 pattern2 resultSort Meta
 instance
-    ( MetaSort resultSort
-    , MetaSort childSort
-    , MetaPattern childSort pattern1
-    , MetaPattern childSort pattern2)
-    => ProperMetaPattern resultSort (PatternEquals childSort pattern1 pattern2)
+    ( MetaOrObject level
+    , AsSort level resultSort
+    , AsSort level childSort
+    , ProperPattern level childSort pattern1
+    , ProperPattern level childSort pattern2)
+    => ProperPattern level
+        resultSort
+        (PatternEquals childSort pattern1 pattern2 resultSort level)
   where
-    asProperMetaPattern
+    asProperPattern
         (PatternEquals (ResultSort resultSort) operandSort first second)
       =
         EqualsPattern Equals
@@ -240,6 +230,9 @@ instance
             , equalsFirst       = asAst first
             , equalsSecond      = asAst second
             }
+
+type MetaEquals childSort pattern1 pattern2 resultSort =
+    PatternEquals childSort pattern1 pattern2 resultSort Meta
 metaEquals
     ::  ( MetaSort resultSort
         , MetaSort childSort
@@ -255,24 +248,6 @@ metaEquals = PatternEquals
 
 type ObjectEquals childSort pattern1 pattern2 resultSort =
     PatternEquals childSort pattern1 pattern2 resultSort Object
-instance
-    ( ObjectSort resultSort
-    , ObjectSort childSort
-    , ObjectPattern childSort pattern1
-    , ObjectPattern childSort pattern2)
-    => ProperObjectPattern
-        resultSort
-        (PatternEquals childSort pattern1 pattern2)
-  where
-    asProperObjectPattern
-        (PatternEquals (ResultSort resultSort) operandSort first second)
-      =
-        EqualsPattern Equals
-            { equalsOperandSort = asAst operandSort
-            , equalsResultSort  = asAst resultSort
-            , equalsFirst       = asAst first
-            , equalsSecond      = asAst second
-            }
 objectEquals
     ::  ( ObjectSort resultSort
         , ObjectSort childSort
@@ -294,13 +269,17 @@ data PatternExists variable pattern1 sort level = PatternExists
     , metaExistsPattern  :: pattern1
     }
 
+instance ( MetaOrObject level
+         , AsSort level sort
+         , AsSort level sv
+         , ProperPattern level sort pattern1)
+    => ProperPattern level sort (PatternExists (PatternVariable sv level) pattern1 sort level)
+  where
+    asProperPattern (PatternExists sort var patt) =
+        ExistsPattern (Exists (asAst sort) (asVariable var) (asAst patt))
+
 type MetaExists variable pattern1 sort =
     PatternExists variable pattern1 sort Meta
-instance (MetaSort sort, MetaSort sv, MetaPattern sort pattern1)
-    => ProperMetaPattern sort (PatternExists (MetaVariable sv) pattern1)
-  where
-    asProperMetaPattern (PatternExists sort var patt) =
-        ExistsPattern (Exists (asAst sort) (asMetaVariable var) (asAst patt))
 metaExists
     :: (MetaSort sort, MetaSort sv, MetaPattern sort pattern1)
     => sort
@@ -311,11 +290,6 @@ metaExists = PatternExists
 
 type ObjectExists variable pattern1 sort =
     PatternExists variable pattern1 sort Object
-instance (ObjectSort sort, ObjectSort sv, ObjectPattern sort pattern1)
-    => ProperObjectPattern sort (PatternExists (ObjectVariable sv) pattern1)
-  where
-    asProperObjectPattern (PatternExists sort var patt) =
-        ExistsPattern (Exists (asAst sort) (asObjectVariable var) (asAst patt))
 objectExists
     :: (ObjectSort sort, ObjectSort sv, ObjectPattern sort pattern1)
     => sort
@@ -331,16 +305,14 @@ data PatternFloor childSort child resultSort level = PatternFloor
     , patternFloorOperandSort :: childSort
     , patternFloorChild       :: child
     }
-
-type MetaFloor childSort child resultSort =
-    PatternFloor childSort child resultSort Meta
 instance
-    ( MetaSort resultSort
-    , MetaSort childSort
-    , MetaPattern childSort child)
-    => ProperMetaPattern resultSort (PatternFloor childSort child)
+    ( MetaOrObject level
+    , AsSort level resultSort
+    , AsSort level childSort
+    , ProperPattern level childSort child)
+    => ProperPattern level resultSort (PatternFloor childSort child resultSort level)
   where
-    asProperMetaPattern
+    asProperPattern
         (PatternFloor (ResultSort resultSort) operandSort child)
       =
         FloorPattern Floor
@@ -348,6 +320,9 @@ instance
             , floorResultSort  = asAst resultSort
             , floorChild       = asAst child
             }
+
+type MetaFloor childSort child resultSort =
+    PatternFloor childSort child resultSort Meta
 metaFloor
     ::  ( MetaSort resultSort
         , MetaSort childSort
@@ -361,20 +336,6 @@ metaFloor = PatternFloor
 
 type ObjectFloor childSort child resultSort =
     PatternFloor childSort child resultSort Object
-instance
-    ( ObjectSort resultSort
-    , ObjectSort childSort
-    , ObjectPattern childSort child)
-    => ProperObjectPattern resultSort (PatternFloor childSort child)
-  where
-    asProperObjectPattern
-        (PatternFloor (ResultSort resultSort) operandSort child)
-      =
-        FloorPattern Floor
-            { floorOperandSort = asAst operandSort
-            , floorResultSort  = asAst resultSort
-            , floorChild       = asAst child
-            }
 objectFloor
     ::  ( ObjectSort resultSort
         , ObjectSort childSort
@@ -393,16 +354,19 @@ data PatternForall variable pattern1 sort level = PatternForall
     , patternForallVariable :: variable
     , patternForallPattern  :: pattern1
     }
+instance ( MetaOrObject level
+         , AsSort level sort
+         , AsSort level variableSort
+         , ProperPattern level sort pattern1)
+    => ProperPattern level
+        sort
+        (PatternForall (PatternVariable variableSort level) pattern1 sort level)
+  where
+    asProperPattern (PatternForall sort var patt) =
+        ForallPattern (Forall (asAst sort) (asVariable var) (asAst patt))
 
 type MetaForall variable pattern1 sort =
     PatternForall variable pattern1 sort Meta
-instance (MetaSort sort, MetaSort variableSort, MetaPattern sort pattern1)
-    => ProperMetaPattern
-        sort
-        (PatternForall (MetaVariable variableSort) pattern1)
-  where
-    asProperMetaPattern (PatternForall sort var patt) =
-        ForallPattern (Forall (asAst sort) (asMetaVariable var) (asAst patt))
 metaForall
     :: (MetaSort sort, MetaSort variableSort, MetaPattern sort pattern1)
     => sort
@@ -413,13 +377,6 @@ metaForall = PatternForall
 
 type ObjectForall variable pattern1 sort =
     PatternForall variable pattern1 sort Object
-instance (ObjectSort sort, ObjectSort variableSort, ObjectPattern sort pattern1)
-    => ProperObjectPattern
-        sort
-        (PatternForall (ObjectVariable variableSort) pattern1)
-  where
-    asProperObjectPattern (PatternForall sort var patt) =
-        ForallPattern (Forall (asAst sort) (asObjectVariable var) (asAst patt))
 objectForall
     :: (ObjectSort sort, ObjectSort variableSort, ObjectPattern sort pattern1)
     => sort
@@ -435,25 +392,22 @@ data PatternIff pattern1 pattern2 sort level = PatternIff
     , patternIffFirst  :: pattern1
     , patternIffSecond :: pattern2
     }
+instance ( MetaOrObject level
+         , AsSort level sort
+         , ProperPattern level sort pattern1
+         , ProperPattern level sort pattern2)
+    => ProperPattern level sort (PatternIff pattern1 pattern2 sort level)
+  where
+    asProperPattern (PatternIff sort first second) =
+        IffPattern (Iff (asAst sort) (asAst first) (asAst second))
 
 type MetaIff pattern1 pattern2 sort = PatternIff pattern1 pattern2 sort Meta
-instance (MetaSort sort, MetaPattern sort pattern1, MetaPattern sort pattern2)
-    => ProperMetaPattern sort (PatternIff pattern1 pattern2)
-  where
-    asProperMetaPattern (PatternIff sort first second) =
-        IffPattern (Iff (asAst sort) (asAst first) (asAst second))
 metaIff
     :: (MetaSort sort, MetaPattern sort pattern1, MetaPattern sort pattern2)
     => sort -> pattern1 -> pattern2 -> MetaIff pattern1 pattern2 sort
 metaIff = PatternIff
 
 type ObjectIff pattern1 pattern2 sort = PatternIff pattern1 pattern2 sort Object
-instance
-    (ObjectSort sort, ObjectPattern sort pattern1, ObjectPattern sort pattern2)
-    => ProperObjectPattern sort (PatternIff pattern1 pattern2)
-  where
-    asProperObjectPattern (PatternIff sort first second) =
-        IffPattern (Iff (asAst sort) (asAst first) (asAst second))
 objectIff
     ::  ( ObjectSort sort
         , ObjectPattern sort pattern1
@@ -469,14 +423,17 @@ data PatternImplies pattern1 pattern2 sort level = PatternImplies
     , patternImpliesFirst  :: pattern1
     , patternImpliesSecond :: pattern2
     }
+instance ( MetaOrObject level
+         , AsSort level sort
+         , ProperPattern level sort pattern1
+         , ProperPattern level sort pattern2)
+    => ProperPattern level sort (PatternImplies pattern1 pattern2 sort level)
+  where
+    asProperPattern (PatternImplies sort first second) =
+        ImpliesPattern (Implies (asAst sort) (asAst first) (asAst second))
 
 type MetaImplies pattern1 pattern2 sort =
     PatternImplies pattern1 pattern2 sort Meta
-instance (MetaSort sort, MetaPattern sort pattern1, MetaPattern sort pattern2)
-    => ProperMetaPattern sort (PatternImplies pattern1 pattern2)
-  where
-    asProperMetaPattern (PatternImplies sort first second) =
-        ImpliesPattern (Implies (asAst sort) (asAst first) (asAst second))
 metaImplies
     :: (MetaSort sort, MetaPattern sort pattern1, MetaPattern sort pattern2)
     => sort -> pattern1 -> pattern2 -> MetaImplies pattern1 pattern2 sort
@@ -484,12 +441,6 @@ metaImplies = PatternImplies
 
 type ObjectImplies pattern1 pattern2 sort =
     PatternImplies pattern1 pattern2 sort Object
-instance
-    (ObjectSort sort, ObjectPattern sort pattern1, ObjectPattern sort pattern2)
-    => ProperObjectPattern sort (PatternImplies pattern1 pattern2)
-  where
-    asProperObjectPattern (PatternImplies sort first second) =
-        ImpliesPattern (Implies (asAst sort) (asAst first) (asAst second))
 objectImplies
     ::  ( ObjectSort sort
         , ObjectPattern sort pattern1
@@ -506,17 +457,15 @@ data PatternIn childSort pattern1 pattern2 resultSort level = PatternIn
     , patternInContainedChild  :: ContainedChild pattern1
     , patternInContainingChild :: pattern2
     }
-
-type MetaIn childSort pattern1 pattern2 resultSort =
-    PatternIn childSort pattern1 pattern2 resultSort Meta
 instance
-    ( MetaSort resultSort
-    , MetaSort childSort
-    , MetaPattern childSort pattern1
-    , MetaPattern childSort pattern2)
-    => ProperMetaPattern resultSort (PatternIn childSort pattern1 pattern2)
+    ( MetaOrObject level
+    , AsSort level resultSort
+    , AsSort level childSort
+    , ProperPattern level childSort pattern1
+    , ProperPattern level childSort pattern2)
+    => ProperPattern level resultSort (PatternIn childSort pattern1 pattern2 resultSort level)
   where
-    asProperMetaPattern
+    asProperPattern
         (PatternIn
             (ResultSort resultSort) operandSort (ContainedChild first) second
         )
@@ -527,6 +476,9 @@ instance
             , inContainedChild       = asAst first
             , inContainingChild      = asAst second
             }
+
+type MetaIn childSort pattern1 pattern2 resultSort =
+    PatternIn childSort pattern1 pattern2 resultSort Meta
 metaIn
     ::  ( MetaSort resultSort
         , MetaSort childSort
@@ -542,24 +494,6 @@ metaIn = PatternIn
 
 type ObjectIn childSort pattern1 pattern2 resultSort =
     PatternIn childSort pattern1 pattern2 resultSort Object
-instance
-    ( ObjectSort resultSort
-    , ObjectSort childSort
-    , ObjectPattern childSort pattern1
-    , ObjectPattern childSort pattern2)
-    => ProperObjectPattern resultSort (PatternIn childSort pattern1 pattern2)
-  where
-    asProperObjectPattern
-        (PatternIn
-            (ResultSort resultSort) operandSort (ContainedChild first) second
-        )
-      =
-        InPattern In
-            { inOperandSort = asAst operandSort
-            , inResultSort  = asAst resultSort
-            , inContainedChild       = asAst first
-            , inContainingChild      = asAst second
-            }
 objectIn
     ::  ( ObjectSort resultSort
         , ObjectSort childSort
@@ -575,21 +509,20 @@ objectIn = PatternIn
 
 -------------------------------------
 
-data PatternNext pattern1 sort level = PatternNext
+data ObjectNext pattern1 sort = ObjectNext
     { patternNextSort  :: sort
     , patternNextChild :: pattern1
     }
 
-type ObjectNext pattern1 sort = PatternNext pattern1 sort Object
 instance (ObjectSort sort, ObjectPattern sort pattern1)
-    => ProperObjectPattern sort (PatternNext pattern1)
+    => ProperPattern Object sort (ObjectNext pattern1 sort)
   where
-    asProperObjectPattern (PatternNext sort child) =
+    asProperPattern (ObjectNext sort child) =
         NextPattern (Next (asAst sort) (asAst child))
 objectNext
     :: (ObjectSort sort, ObjectPattern sort pattern1)
     => sort -> pattern1 -> ObjectNext pattern1 sort
-objectNext = PatternNext
+objectNext = ObjectNext
 
 -------------------------------------
 
@@ -597,24 +530,21 @@ data PatternNot pattern1 sort level = PatternNot
     { patternNotSort  :: sort
     , patternNotChild :: pattern1
     }
+instance ( MetaOrObject level
+         , AsSort level sort
+         , ProperPattern level sort pattern1)
+    => ProperPattern level sort (PatternNot pattern1 sort level)
+  where
+    asProperPattern (PatternNot sort child) =
+        NotPattern (Not (asAst sort) (asAst child))
 
 type MetaNot pattern1 sort = PatternNot pattern1 sort Meta
-instance (MetaSort sort, MetaPattern sort pattern1)
-    => ProperMetaPattern sort (PatternNot pattern1)
-  where
-    asProperMetaPattern (PatternNot sort child) =
-        NotPattern (Not (asAst sort) (asAst child))
 metaNot
     :: (MetaSort sort, MetaPattern sort pattern1)
     => sort -> pattern1 -> MetaNot pattern1 sort
 metaNot = PatternNot
 
 type ObjectNot pattern1 sort = PatternNot pattern1 sort Object
-instance (ObjectSort sort, ObjectPattern sort pattern1)
-    => ProperObjectPattern sort (PatternNot pattern1)
-  where
-    asProperObjectPattern (PatternNot sort child) =
-        NotPattern (Not (asAst sort) (asAst child))
 objectNot
     :: (ObjectSort sort, ObjectPattern sort pattern1)
     => sort -> pattern1 -> ObjectNot pattern1 sort
@@ -627,25 +557,22 @@ data PatternOr pattern1 pattern2 sort level = PatternOr
     , patternOrFirst  :: pattern1
     , patternOrSecond :: pattern2
     }
+instance ( MetaOrObject level
+         , AsSort level sort
+         , ProperPattern level sort pattern1
+         , ProperPattern level sort pattern2)
+    => ProperPattern level sort (PatternOr pattern1 pattern2 sort level)
+  where
+    asProperPattern (PatternOr sort pattern1 pattern2) =
+        OrPattern (Or (asAst sort) (asAst pattern1) (asAst pattern2))
 
 type MetaOr pattern1 pattern2 sort = PatternOr pattern1 pattern2 sort Meta
-instance (MetaSort sort, MetaPattern sort pattern1, MetaPattern sort pattern2)
-    => ProperMetaPattern sort (PatternOr pattern1 pattern2)
-  where
-    asProperMetaPattern (PatternOr sort pattern1 pattern2) =
-        OrPattern (Or (asAst sort) (asAst pattern1) (asAst pattern2))
 metaOr
     :: (MetaSort sort, MetaPattern sort pattern1, MetaPattern sort pattern2)
     => sort -> pattern1 -> pattern2 -> MetaOr pattern1 pattern2 sort
 metaOr = PatternOr
 
 type ObjectOr pattern1 pattern2 sort = PatternOr pattern1 pattern2 sort Object
-instance
-    (ObjectSort sort, ObjectPattern sort pattern1, ObjectPattern sort pattern2)
-    => ProperObjectPattern sort (PatternOr pattern1 pattern2)
-  where
-    asProperObjectPattern (PatternOr sort pattern1 pattern2) =
-        OrPattern (Or (asAst sort) (asAst pattern1) (asAst pattern2))
 objectOr
     ::  ( ObjectSort sort
         , ObjectPattern sort pattern1
@@ -656,22 +583,20 @@ objectOr = PatternOr
 
 -------------------------------------
 
-data PatternRewrites pattern1 pattern2 sort level = PatternRewrites
+data ObjectRewrites pattern1 pattern2 sort = ObjectRewrites
     { patternRewritesSort   :: sort
     , patternRewritesFirst  :: pattern1
     , patternRewritesSecond :: pattern2
     }
 
-type ObjectRewrites pattern1 pattern2 sort =
-    PatternRewrites pattern1 pattern2 sort Object
 instance
     ( ObjectSort sort
     , ObjectPattern sort pattern1
     , ObjectPattern sort pattern2
     )
-    => ProperObjectPattern sort (PatternRewrites pattern1 pattern2)
+    => ProperPattern Object sort (ObjectRewrites pattern1 pattern2 sort)
   where
-    asProperObjectPattern (PatternRewrites sort pattern1 pattern2) =
+    asProperPattern (ObjectRewrites sort pattern1 pattern2) =
         RewritesPattern
             (Rewrites (asAst sort) (asAst pattern1) (asAst pattern2))
 objectRewrites
@@ -680,51 +605,46 @@ objectRewrites
         , ObjectPattern sort pattern2
         )
     => sort -> pattern1 -> pattern2 -> ObjectRewrites pattern1 pattern2 sort
-objectRewrites = PatternRewrites
+objectRewrites = ObjectRewrites
 
 -------------------------------------
 
 newtype PatternTop sort level = PatternTop
     { patternTopSort :: sort }
+instance (MetaOrObject level, AsSort level sort)
+         => ProperPattern level sort (PatternTop sort level) where
+    asProperPattern (PatternTop sort) =
+        TopPattern (Top (asAst sort))
 
 type MetaTop sort = PatternTop sort Meta
-instance MetaSort sort => ProperMetaPattern sort PatternTop where
-    asProperMetaPattern (PatternTop sort) =
-        TopPattern (Top (asAst sort))
 metaTop :: (MetaSort sort) => sort -> MetaTop sort
 metaTop = PatternTop
 
 type ObjectTop sort = PatternTop sort Object
-instance ObjectSort sort => ProperObjectPattern sort PatternTop
-  where
-    asProperObjectPattern (PatternTop sort) =
-        TopPattern (Top (asAst sort))
 objectTop :: ObjectSort sort => sort -> ObjectTop sort
 objectTop = PatternTop
 
 -------------------------------------
 
-newtype PatternString sort level = PatternString
+newtype MetaString = MetaString
     { patternStringValue :: String }
 
-type MetaString = PatternString CharListSort Meta
-instance ProperMetaPattern CharListSort PatternString where
-    asProperMetaPattern (PatternString value) =
+instance ProperPattern Meta CharListSort MetaString where
+    asProperPattern (MetaString value) =
         StringLiteralPattern (StringLiteral value)
 metaString :: String -> MetaString
-metaString = PatternString
+metaString = MetaString
 
 -------------------------------------
 
-newtype PatternChar sort level = PatternChar
+newtype MetaChar = MetaChar
     { patternCharValue :: Char }
 
-type MetaChar = PatternChar CharListSort Meta
-instance ProperMetaPattern CharListSort PatternChar where
-    asProperMetaPattern (PatternChar value) =
+instance ProperPattern Meta CharListSort MetaChar where
+    asProperPattern (MetaChar value) =
         CharLiteralPattern (CharLiteral value)
 metaChar :: Char -> MetaChar
-metaChar = PatternChar
+metaChar = MetaChar
 
 -------------------------------------
 
@@ -733,11 +653,17 @@ data PatternVariable sort level = PatternVariable
     , metaVariableSort :: !sort
     }
 
-type MetaVariable sort = PatternVariable sort Meta
-instance MetaSort sort => ProperMetaPattern sort PatternVariable
+instance ( MetaOrObject level
+         , AsSort level sort)
+  => ProperPattern level sort (PatternVariable sort level)
   where
-    asProperMetaPattern var =
-        VariablePattern (asMetaVariable var)
+    asProperPattern var =
+        VariablePattern (asVariable var)
+asVariable :: (MetaOrObject level, AsSort level sort)
+           => PatternVariable sort level -> Variable level
+asVariable (PatternVariable name sort) = Variable (Id name) (asAst sort)
+
+type MetaVariable sort = PatternVariable sort Meta
 metaVariable
     :: MetaSort sort
     => String -> sort -> MetaVariable sort
@@ -746,10 +672,6 @@ asMetaVariable :: MetaSort sort => MetaVariable sort -> Variable Meta
 asMetaVariable (PatternVariable name sort) = Variable (Id name) (asAst sort)
 
 type ObjectVariable sort = PatternVariable sort Object
-instance ObjectSort sort => ProperObjectPattern sort PatternVariable
-  where
-    asProperObjectPattern var =
-        VariablePattern (asObjectVariable var)
 objectVariable
     :: ObjectSort sort
     => String -> sort -> ObjectVariable sort

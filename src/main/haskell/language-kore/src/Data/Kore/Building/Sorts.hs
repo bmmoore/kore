@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-|
 Module      : Data.Kore.Building.Sorts
 Description : Builders for meta sorts and sort variables.
@@ -18,11 +19,9 @@ import           Data.Kore.AST.Common
 import           Data.Kore.Building.AsAst
 import           Data.Kore.Implicit.ImplicitSorts
 
-class AsAst (Sort Meta) sort => MetaSort sort where
-class AsAst (Sort Object) sort => ObjectSort sort where
-
-instance AsAst (Sort Meta) (sort Meta) => MetaSort (sort Meta) where
-instance AsAst (Sort Object) (sort Object) => ObjectSort (sort Object) where
+type AsSort level = AsAst (Sort level)
+type MetaSort = AsSort Meta
+type ObjectSort = AsSort Object
 
 data CharSortP level where CharSort :: CharSort
 type CharSort = CharSortP Meta

@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MonoLocalBinds #-}
+-- to suppress warnings about the simplifiable instance (AsAst UnifiedPattern _)
 module Kore.MatchingLogic.ProofSystem.ProofAssistantTest
     (proofAssistantTests) where
 
@@ -769,19 +771,21 @@ data MetaSigma s p1 p2 p3 = MetaSigma
     , metaSigmaThird  :: p3
     }
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => AsMetaPattern (MetaSigma s p1 p2 p3)
+    => ProperPattern Meta s (MetaSigma s p1 p2 p3)
   where
-    asMetaPattern (MetaSigma _ p1 p2 p3) =
+    asProperPattern (MetaSigma _ p1 p2 p3) =
         ApplicationPattern Application
             { applicationSymbolOrAlias = sigmaSymbol
             , applicationChildren = [asAst p1, asAst p2, asAst p3]
             }
+{-
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
     => AsAst UnifiedPattern (MetaSigma s p1 p2 p3)
   where
     asAst = MetaPattern . asMetaPattern
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
     => MetaPattern s (MetaSigma s p1 p2 p3) where
+  -}
 metaSigma
     :: (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
     => s -> p1 -> p2 -> p3 -> MetaSigma s p1 p2 p3
@@ -825,9 +829,9 @@ data MetaSigmoid s p1 p2 p3 = MetaSigmoid
     , metaSigmoidThird  :: p3
     }
 instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => AsMetaPattern (MetaSigmoid s p1 p2 p3)
+    => ProperPattern Meta s (MetaSigmoid s p1 p2 p3)
   where
-    asMetaPattern (MetaSigmoid _ p1 p2 p3) =
+    asProperPattern (MetaSigmoid _ p1 p2 p3) =
         ApplicationPattern Application
             { applicationSymbolOrAlias = SymbolOrAlias
                 { symbolOrAliasConstructor = sigmoidId
@@ -835,12 +839,6 @@ instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
                 }
             , applicationChildren = [asAst p1, asAst p2, asAst p3]
             }
-instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => AsAst UnifiedPattern (MetaSigmoid s p1 p2 p3)
-  where
-    asAst = MetaPattern . asMetaPattern
-instance (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
-    => MetaPattern s (MetaSigmoid s p1 p2 p3) where
 metaSigmoid
     :: (MetaSort s, MetaPattern s p1, MetaPattern s p2, MetaPattern s p3)
     => s -> p1 -> p2 -> p3 -> MetaSigmoid s p1 p2 p3
