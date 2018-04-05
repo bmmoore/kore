@@ -1,33 +1,39 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 module Main where
-import Data.Char(isSpace, isAlphaNum)
+import           Data.Char                                     (isAlphaNum,
+                                                                isSpace)
 
-import qualified Data.Set as Set
-import qualified Data.Map.Strict as Map
+import qualified Data.Map.Strict                               as Map
+import qualified Data.Set                                      as Set
 
-import Control.Applicative(some)
-import Control.Monad.IO.Class(liftIO)
-import Control.Monad.State.Strict(StateT,runStateT,MonadState(..))
-import Data.List(isPrefixOf,isSuffixOf)
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import Data.Text
+import           Control.Applicative                           (some)
+import           Control.Monad.IO.Class                        (liftIO)
+import           Control.Monad.State.Strict                    (MonadState (..),
+                                                                StateT,
+                                                                runStateT)
+import           Data.List                                     (isPrefixOf,
+                                                                isSuffixOf)
+import           Data.Text
+import           Text.Megaparsec
+import           Text.Megaparsec.Char
 
-import Data.Text.Prettyprint.Doc hiding (space)
-import qualified Data.Text.Prettyprint.Doc as Doc
+import           Data.Text.Prettyprint.Doc                     hiding (space)
+import qualified Data.Text.Prettyprint.Doc                     as Doc
 
-import Data.Reflection
+import           Data.Reflection
 
-import System.Console.Haskeline
+import           System.Console.Haskeline
 
-import Kore.MatchingLogic.ProverRepl
-import Kore.MatchingLogic.HilbertProof
-import Kore.MatchingLogic.ProofSystem.Minimal
-import Kore.MatchingLogic.ProofSystem.Minimal.Syntax(parseId,parseMLRuleSig)
-import Kore.MatchingLogic.AST
-import Kore.MatchingLogic.AST.Syntax
-import Kore.MatchingLogic.Signature.Simple
+import           Kore.MatchingLogic.AST
+import           Kore.MatchingLogic.AST.Syntax
+import           Kore.MatchingLogic.HilbertProof
+import           Kore.MatchingLogic.ProofSystem.Minimal
+import           Kore.MatchingLogic.ProofSystem.Minimal.Syntax (parseId,
+                                                                parseMLRuleSig)
+import           Kore.MatchingLogic.ProverRepl
+import           Kore.MatchingLogic.Signature.Simple
 
 -- Todo: Parsing Formula as Text. Hook to Kore Parser
 parseName :: Parser Text
@@ -48,7 +54,7 @@ pCommand = parseCommand parseName parseFormula parseRule
 proveCommand :: (Reifies sig ValidatedSignature)
              => proxy (SimpleSignature sig)
              -> IO (ProverState Text (MLRuleSig (SimpleSignature sig) Text) (WFPattern (SimpleSignature sig) Text))
-proveCommand _ = runProver pCommand (ProverState emptyProof)
+proveCommand _ = runProver simpleFormulaVerifier pCommand (ProverState emptyProof)
 
 banner :: InputT IO ()
 banner = outputStrLn "Welcome to the matching logic prover"

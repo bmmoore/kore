@@ -1,3 +1,4 @@
+{-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-| Description: Parser and pretty-printer for the minimal proof system
 
@@ -24,8 +25,8 @@ import           Data.Void
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 
-import           Kore.MatchingLogic.AST.Syntax          (mlPattern)
 import qualified Kore.MatchingLogic.AST                 as AST
+import           Kore.MatchingLogic.AST.Syntax          (mlPattern)
 import           Kore.MatchingLogic.HilbertProof
 import           Kore.MatchingLogic.ProofSystem.Minimal
 import           Kore.MatchingLogic.Signature
@@ -42,7 +43,7 @@ comma :: Parser ()
 comma = char ',' >> space
 
 number :: Parser Int
-number = read <$> some digitChar
+number = read <$> Control.Applicative.some digitChar
 
 parsePathPos :: Parser [Int]
 parsePathPos = sepBy number space1
@@ -89,7 +90,10 @@ parseMLRule pSort pLabel pVar pTerm pIx =
     generalization = rule "ug" $
       Generalization <$> pVar `arg` pIx
     varsubst = rule "varsubst" $
-      VariableSubstitution <$> pVar `arg` pIx `arg` pVar
+      VariableSubstitution <$>
+        (SubstitutedVariable <$> pVar)
+        `arg` pTerm
+        `arg` (SubstitutingVariable <$> pVar)
     forall = rule "forall" $
       Forall <$> pVar `arg` pTerm `arg` pTerm
     necessitation = rule "necessitation" $
@@ -138,7 +142,8 @@ instance (Pretty sort, Pretty label, Pretty var, Pretty term, Pretty hyp)
     Propositional3 p1 p2 -> rule "propositional3" [pretty p1, pretty p2]
     ModusPonens h1 h2 -> rule "mp" [pretty h1,pretty h2]
     Generalization v h -> rule "ug" [pretty v,pretty h]
-    VariableSubstitution x h y -> rule "varsubst" [pretty x,pretty h,pretty y]
+    VariableSubstitution (SubstitutedVariable x) h (SubstitutingVariable y) ->
+      rule "varsubst" [pretty x,pretty h,pretty y]
     Forall v p1 p2 -> rule "forall" [pretty v,pretty p1,pretty p2]
     Necessitation lbl pos h -> rule "necessitation" [pretty lbl,pretty pos,pretty h]
     PropagateOr lbl pos p1 p2 -> rule "propagate-or" [pretty lbl,pretty pos,pretty p1,pretty p2]

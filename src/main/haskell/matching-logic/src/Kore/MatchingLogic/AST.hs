@@ -1,8 +1,8 @@
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
 {-|
 Description: A type of matching logic patterns
 
@@ -23,15 +23,13 @@ module Kore.MatchingLogic.AST
   , checkSorts
   ) where
 
-import Data.Functor.Classes
-import           Data.Typeable (Typeable, cast, typeOf, typeRepArgs)
-import Data.Proxy
-import Data.Deriving(deriveEq1,deriveShow1)
-import Data.Functor.Foldable --(Fix(Fix))
-import Data.Coerce
-import Data.Text.Prettyprint.Doc
+import           Data.Coerce
+import           Data.Deriving                (deriveEq1, deriveShow1)
+import           Data.Functor.Foldable
+import           Data.Text.Prettyprint.Doc
+import           Data.Typeable                (Typeable)
 
-import Kore.MatchingLogic.Signature
+import           Kore.MatchingLogic.Signature
 
 data PatternF sort label v p
   = Variable sort v
@@ -81,8 +79,8 @@ checkSorts pat = cata (\p -> sequenceA p >>= checkSorts1) pat
 
 patternSort :: (IsSignature sig) => SigPatternF sig v p -> Sort sig
 patternSort p = case p of
-  Variable s _ -> s
+  Variable s _    -> s
   Application l _ -> labelResult l
-  And s _ _ -> s
-  Not s _ -> s
-  Exists s _ _ _ -> s
+  And s _ _       -> s
+  Not s _         -> s
+  Exists s _ _ _  -> s

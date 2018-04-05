@@ -1,5 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ExplicitForAll        #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {- |
 Description: Parser and printer for matching logic patterns, using a subset of Kore syntax.
 
@@ -15,23 +18,22 @@ module Kore.MatchingLogic.AST.Syntax
   , simpleSigLabel
   , simpleSigSort
   ) where
-import Kore.MatchingLogic.AST
-import Kore.MatchingLogic.Signature.Simple
+import           Kore.MatchingLogic.AST
+import           Kore.MatchingLogic.Signature.Simple
 
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import Text.Megaparsec.Expr
+import           Text.Megaparsec
+import           Text.Megaparsec.Char
 
-import qualified Data.Text.Prettyprint.Doc as Doc
-import Data.Text.Prettyprint.Doc(Doc,(<>),Pretty(..))
+import           Data.Text.Prettyprint.Doc           (Doc, Pretty (..), (<>))
+import qualified Data.Text.Prettyprint.Doc           as Doc
 
-import Data.Void
-import Data.Text(Text,pack,unpack)
-import Data.Functor.Foldable(Fix(Fix))
-import Control.Applicative
-import Data.Char (isAlphaNum)
+import           Control.Applicative
+import           Data.Char                           (isAlphaNum)
+import           Data.Functor.Foldable               (Fix (Fix))
+import           Data.Text                           (Text)
+import           Data.Void
 
-import Data.Reflection
+import           Data.Reflection
 
 type Parser = Parsec Void Text
 
@@ -84,7 +86,7 @@ simpleSigPattern pSortName pLabelName pVar = do
     Nothing -> fail "Unknown label or sort names"
     Just unsortedPat ->
       case checkSorts unsortedPat of
-        Nothing -> fail "Ill-sorted term"
+        Nothing     -> fail "Ill-sorted term"
         Just sorted -> return sorted
 
 simpleSigLabel :: (Reifies sig ValidatedSignature)
@@ -93,7 +95,7 @@ simpleSigLabel pName = do
   name <- pName
   case findLabel name of
     Just lbl -> return lbl
-    Nothing -> fail $ "Unknown label"
+    Nothing  -> fail "Unknown label"
 
 simpleSigSort :: (Reifies sig ValidatedSignature)
                => Parser Text -> Parser (Sort (SimpleSignature sig))
@@ -101,7 +103,7 @@ simpleSigSort pName = do
   name <- pName
   case findSort name of
     Just srt -> return srt
-    Nothing -> fail $ "Unknown label"
+    Nothing  -> fail "Unknown label"
 
 -- formula :: Parser Label
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-|
 Description: The minimal matching logic proof system
 
@@ -5,10 +6,20 @@ This module defines the minimal matching logic proof system,
 which does not assume the existence of a definedness symbol).
  -}
 module Kore.MatchingLogic.ProofSystem.Minimal where
-import           Data.Text
-import           Kore.MatchingLogic.AST             as AST
+
+import           Data.Text.Prettyprint.Doc       (Pretty (pretty))
+
+import           Data.Functor.Foldable           (Fix (..))
+import           Kore.MatchingLogic.AST          as AST
+import           Kore.MatchingLogic.Error
 import           Kore.MatchingLogic.HilbertProof
-import Data.Functor.Foldable(Fix(..))
+
+import           Data.Kore.Error
+
+newtype SubstitutedVariable var = SubstitutedVariable var
+    deriving Show
+newtype SubstitutingVariable var = SubstitutingVariable var
+    deriving Show
 
 {-|
   This type has constructors for each rule of the
@@ -27,7 +38,8 @@ data MLRule sort label var term hypothesis =
  | Propositional3 term term
  | ModusPonens hypothesis hypothesis
  | Generalization var hypothesis
- | VariableSubstitution var hypothesis var
+ | VariableSubstitution
+    (SubstitutedVariable var) term (SubstitutingVariable var)
  | Forall var term term
  | Necessitation label Int hypothesis
  | PropagateOr label Int term term
@@ -43,6 +55,9 @@ data MLRule sort label var term hypothesis =
 -- | The 'MLRuleSig' synonym instantiates 'MLRule' to use
 -- the sorts, labels, and patterns from the 'IsSignature' instance 'sig'
 type MLRuleSig sig var = MLRule (Sort sig) (Label sig) var (SigPattern sig var)
+
+simpleFormulaVerifier :: formula -> Either (Error MLError) ()
+simpleFormulaVerifier _ = return ()
 
 notPat :: (IsSignature sig)
        => Sort sig -> SigPattern sig var -> SigPattern sig var
@@ -61,17 +76,23 @@ patSort (Fix pat) = patternSort pat
 -- | This instance is currently incomplete, it correctly checks
 -- uses of propositional1 and propositional2 but rejects any other rules.
 instance (IsSignature sig, Eq (Sort sig), Eq (Label sig), Eq var) =>
-         ProofSystem (MLRuleSig sig var) (WFPattern sig var) where
+         ProofSystem MLError (MLRuleSig sig var) (WFPattern sig var) where
   checkDerivation conclusion rule = case rule of
     Propositional1 phi1 phi2
       | patSort phi1 == patSort phi2
-        -> let s = patSort phi1
-               statement = implies s phi1 (implies s phi2 phi1)
-           in fromWFPattern conclusion == statement
+        ->  let s = patSort phi1
+                statement = implies s phi1 (implies s phi2 phi1)
+            in
+                mlFailWhen
+                    (fromWFPattern conclusion /= statement)
+                    [pretty "Different conclusion"]
     Propositional2 phi1 phi2 phi3
       | patSort phi1 == patSort phi2
       , patSort phi1 == patSort phi3
-        -> let s = patSort phi1
-               statement = implies s phi1 (implies s phi2 phi1)
-           in fromWFPattern conclusion == statement
-    _ -> False
+        ->  let s = patSort phi1
+                statement = implies s phi1 (implies s phi2 phi1)
+            in
+                mlFailWhen
+                    (fromWFPattern conclusion /= statement)
+                    [pretty "Different conclusion"]
+    _ -> mlFail [pretty "Sort mismatch"]
