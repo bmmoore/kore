@@ -51,6 +51,12 @@ data MLRule sort label var term hypothesis =
  | Existence var
      -- ^ Ex x.x
  | Singvar var term [Int] [Int]
+ | Proj1 term term
+ | Proj2 term term
+ | AndIntro term term
+ | OrElim term term term
+ | OrIntroL term term
+ | OrIntroR term term
  deriving (Functor, Foldable, Traversable, Eq, Show)
 
 transformRule :: (Applicative f)
@@ -80,6 +86,12 @@ transformRule sort label var term hypothesis rule = case rule of
     Existence v -> Existence <$> var v
     Singvar v t path1 path2
       -> (\v' t' -> Singvar v' t' path1 path2) <$> var v <*> term t
+    Proj1 t1 t2 -> Proj1 <$> term t1 <*> term t2
+    Proj2 t1 t2 -> Proj2 <$> term t1 <*> term t2
+    AndIntro t1 t2 -> AndIntro <$> term t1 <*> term t2
+    OrElim t1 t2 t3 -> OrElim <$> term t1 <*> term t2 <*> term t3
+    OrIntroL t1 t2 -> OrIntroL <$> term t1 <*> term t2
+    OrIntroR t1 t2 -> OrIntroR <$> term t1 <*> term t2
 
 -- | Lens focusing on the terms within a Rule.
 ruleTerms :: (Applicative f)
@@ -162,7 +174,7 @@ instance (IsSignature sig, Eq (Sort sig), Eq (Label sig), Eq var) =>
           Left (Error [] "hypothesis has wrong form")
       PropagateOr label pos phi1 phi2 -> do
           case conclusion of
-            IffP s (ApplicationP label1 args1)
+            ImpliesP s (ApplicationP label1 args1)
                    (OrP _ (ApplicationP label2a args2a) (ApplicationP label2b args2b))
               | label1 == label2a, label1 == label2b,
                 (before1,OrP _ term1a term1b:after1) <- splitAt pos args1,
@@ -179,7 +191,7 @@ instance (IsSignature sig, Eq (Sort sig), Eq (Label sig), Eq var) =>
      --     sigma(before ..,\phi1, .. after) \/ sigma(before ..,\phi2,.. after)
       PropagateExists label pos var term ->
           case conclusion of
-            IffP s (ApplicationP label1 args1)
+            ImpliesP s (ApplicationP label1 args1)
                    (ExistsP _ sVar2 var2 (ApplicationP label2 args2))
               | label1 == label2,
                 take pos args1 == take pos args2,
@@ -212,6 +224,40 @@ instance (IsSignature sig, Eq (Sort sig), Eq (Label sig), Eq var) =>
                         var == var1, term == Just term1 -> Right ()
                     _ -> Left (Error [] "")
                 _ -> Left (Error [] "")
+      Proj1 a b ->
+          case conclusion of
+            ImpliesP sVar (AndP sVar' a1 b1) a2
+              | sVar == sVar', a == Just a1, a1 == a2, b == Just b1 -> Right ()
+            _ -> Left (Error [] "expected formula of the form (A /\\ B) -> A")
+      Proj2 a b ->
+          case conclusion of
+            ImpliesP sVar (AndP sVar' a1 b1) b2
+              | sVar == sVar', a == Just a1, b == Just b1, b1 == b2 -> Right ()
+            _ -> Left (Error [] "expected formula of the form (A /\\ B) -> B")
+      AndIntro a b ->
+          case conclusion of
+            ImpliesP sVar a1 (ImpliesP sVar1 b1 (AndP sVar2 a2 b2))
+              | sVar == sVar1, sVar1 == sVar2, a == Just a1, a1 == a2, b == Just b1, b1 == b2 -> Right ()
+            _ -> Left (Error [] "expected formula of the form A -> B -> A /\\ B")
+      OrElim a b c ->
+          case conclusion of
+            ImpliesP sVar (ImpliesP sVar1 a1 c1)
+                (ImpliesP sVar2 (ImpliesP sVar3 b1 c2)
+                                (ImpliesP sVar4 (OrP sVar5 a2 b2) c3))
+                | all (sVar==) [sVar1, sVar2, sVar3, sVar4, sVar5]
+                , a == Just a1, a1 == a2, b == Just b1, b1 == b2, c == Just c1, c1 == c2, c2 == c3 -> Right ()
+            _ -> Left (Error [] "expected formula of the form (A -> C) -> (B -> C) -> (A \\/ B -> C)")
+      OrIntroL a b ->
+          case conclusion of
+            ImpliesP sVar a1 (OrP sVar' a2 b1)
+                | sVar == sVar', a == Just a1, a1 == a2, b == Just b1 -> Right ()
+            _ -> Left (Error [] "expected formula of the form A -> A \\/ B")
+      OrIntroR a b ->
+          case conclusion of
+            ImpliesP sVar b1 (OrP sVar' a1 b2)
+                | sVar == sVar', a == Just a1, b == Just b1, b1 == b2 -> Right ()
+            _ -> Left (Error [] "expected formula of the form B -> A \\/ B")
+
     where
       -- | Local infix operator for building an implication
       infixr 1 -->
