@@ -59,7 +59,7 @@ mlPattern pSort pLabel pVar = pat
     patF =
           alt "\\and" And sort1 (arg2 pat pat)
       <|> alt "\\not" Not sort1 (arg1 pat)
-      <|> alt "\\exists" (uncurry . Exists) sort1 (arg2 annVar pat)
+      <|> alt "\\forall" (uncurry . Forall) sort1 (arg2 annVar pat)
       <|> try (Application <$> pLabel <*> parens (sepBy pat comma))
       <|> uncurry Variable <$> annVar
     annVar :: Parser (sort, var)
@@ -114,8 +114,8 @@ prettyPat pSort pLabel pVar pChild = pPat
       And s p1 p2 -> pretty ("\\and"::Text) <> Doc.braces (pSort s)
         <> Doc.parens (pChild p1 <> Doc.comma <> pChild p2)
       Not s p -> pretty ("\\not"::Text) <> Doc.braces (pSort s) <> Doc.parens (pChild p)
-      Exists s sVar v p ->
-        pretty ("\\exists"::Text) <> Doc.braces (pSort s)
+      Forall s sVar v p ->
+        pretty ("\\forall"::Text) <> Doc.braces (pSort s)
           <> Doc.parens (pVar v <> Doc.colon <> pSort s <> Doc.comma <> pChild p)
 
 instance (Pretty sort, Pretty label, Pretty var, Pretty p)

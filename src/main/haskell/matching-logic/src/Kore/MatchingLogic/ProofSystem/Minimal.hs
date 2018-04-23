@@ -105,7 +105,7 @@ substVar :: (Eq sort, Eq var)
          -> Maybe (Pattern sort label var)
 substVar sort varFrom varTo pat = go pat
   where
-    go pat@(Fix (AST.Exists _ sortBound varBound _))
+    go pat@(Fix (AST.Forall _ sortBound varBound _))
       | (sortBound,varBound) == (sort,varFrom) = Just pat
       | (sortBound,varBound) == (sort,varTo) = Nothing
     go pat@(Fix (Variable sortVar varVar))

@@ -33,20 +33,20 @@ module Kore.MatchingLogic.AST
   , pattern ApplicationP
   , pattern AndP
   , pattern NotP
-  , pattern ExistsP
+  , pattern ForallP
   , variableP
   , applicationP
   , andP
   , notP
-  , existsP
+  , forallP
   , pattern OrP
   , pattern ImpliesP
   , pattern IffP
-  , pattern ForallP
+  , pattern ExistsP
   , orP
   , impliesP
   , iffP
-  , forallP
+  , existsP
   , andP' , notP', orP', impliesP', iffP', forallP', existsP'
   ) where
 
@@ -68,7 +68,7 @@ data PatternF sort -- ^ The type of sorts
   | Application label [p]
   | And sort p p
   | Not sort p
-  | Exists sort sort v p
+  | Forall sort sort v p
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 deriveEq1 ''PatternF
@@ -86,7 +86,7 @@ visitPatternF sort label var pat term = case term of
   Application l args -> Application <$> label l <*> traverse pat args
   And s p1 p2 -> And <$> sort s <*> pat p1 <*> pat p2
   Not s p -> Not <$> sort s <*> pat p
-  Exists s sVar v p -> Exists <$> sort s <*> sort sVar <*> var v <*> pat p
+  Forall s sVar v p -> Forall <$> sort s <*> sort sVar <*> var v <*> pat p
 
 -- | Specializing 'PatternF' to use the sort and label from a signature 'sig'.
 type SigPatternF sig = PatternF (Sort sig) (Label sig)
@@ -105,7 +105,7 @@ patternSort p = case p of
     Application l _ -> labelResult l
     And s _ _       -> s
     Not s _         -> s
-    Exists s _ _ _  -> s
+    Forall s _ _ _  -> s
 
 -- | Patterns which are well-formed with respect to signature 'sig'
 newtype WFPattern sig var = WFPattern {fromWFPattern :: SigPattern sig var}
@@ -136,7 +136,7 @@ checkSorts1 pat = if patOk then Just (WFPattern (Fix (coerce pat))) else Nothing
         and (zipWith (==) (labelArguments l) (map wfPatSort ps))
       And _ _ _ -> childrenSame
       Not _ _ -> childrenSame
-      Exists _ _ _ _ -> childrenSame
+      Forall _ _ _ _ -> childrenSame
     childrenSame = all (==patternSort pat) (fmap wfPatSort pat)
 
 -- | Check if a pattern is well-sorted
@@ -154,7 +154,7 @@ notFree :: (Eq sort, Eq var, ToPattern p sort label var)
         => sort -> var -> p -> Bool
 notFree sVar var p = go (toPattern p)
   where go (Variable sVar' var') = not (sVar' == sVar && var' == var)
-        go (Exists _ sVar' var' _)
+        go (Forall _ sVar' var' _)
           | sVar' == sVar, var' == var = True
         go pat = all (go . toPattern) pat
 
@@ -184,8 +184,8 @@ pattern AndP s p1 p2 <- (toPattern -> And s p1 p2)
 pattern NotP :: (ToPattern p sort label var) => sort -> p -> p
 pattern NotP s p <- (toPattern -> Not s p)
 
-pattern ExistsP :: (ToPattern p sort label var) => sort -> sort -> var -> p -> p
-pattern ExistsP s sVar var p <- (toPattern -> Exists s sVar var p)
+pattern ForallP :: (ToPattern p sort label var) => sort -> sort -> var -> p -> p
+pattern ForallP s sVar var p <- (toPattern -> Forall s sVar var p)
 
 variableP :: (FromPattern p sort label var) => sort -> var -> p
 variableP sort var = fromPattern (Variable sort var)
@@ -195,8 +195,8 @@ andP :: (FromPattern p sort label var) => sort -> p -> p -> p
 andP s p1 p2 = fromPattern (And s p1 p2)
 notP :: (FromPattern p sort label var) => sort -> p -> p
 notP s p = fromPattern (Not s p)
-existsP :: (FromPattern p sort label var) => sort -> sort -> var -> p -> p
-existsP s sVar var p = fromPattern (Exists s sVar var p)
+forallP :: (FromPattern p sort label var) => sort -> sort -> var -> p -> p
+forallP s sVar var p = fromPattern (Forall s sVar var p)
 
 pattern OrP s p1 p2 <- NotP s (AndP ((==s)->True)
                                 (NotP ((==s)->True) p1)
@@ -210,11 +210,11 @@ pattern IffP s p1 p2 <- AndP s (ImpliesP ((==s)->True) p1 p2)
                                (ImpliesP ((==s)->True) ((==p2)->True) ((==p1)->True))
 iffP s p1 p2 = andP s (impliesP s p1 p2) (impliesP s p2 p1)
 
-pattern ForallP s sVar var p <-
-    NotP s (ExistsP ((==s)->True) sVar var (NotP ((==s)->True) p))
+pattern ExistsP s sVar var p <-
+    NotP s (ForallP ((==s)->True) sVar var (NotP ((==s)->True) p))
 
-forallP :: (FromPattern p sort label var) => sort -> sort -> var -> p -> p
-forallP s sVar var p = notP s (existsP s sVar var (notP s p))
+existsP :: (FromPattern p sort label var) => sort -> sort -> var -> p -> p
+existsP s sVar var p = notP s (forallP s sVar var (notP s p))
 
 type IsSigPatternIn m p sig var =
   ( IsSignature sig
