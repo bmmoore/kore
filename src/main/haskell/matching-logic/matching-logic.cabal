@@ -103,6 +103,7 @@ test-suite test
                , tasty-hunit
                , tasty-quickcheck
   other-modules: Kore.MatchingLogic.ProofSystem.ProofAssistantTest
+               , Kore.MatchingLogic.ProofSystem.OnePlusOne
                , RuleParserTests
                , TestUtils
   default-language: Haskell2010
